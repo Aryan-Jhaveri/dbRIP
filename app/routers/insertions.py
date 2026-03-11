@@ -43,11 +43,17 @@ router = APIRouter(prefix="/v1", tags=["insertions"])
 # ── Helper ───────────────────────────────────────────────────────────────
 
 def _apply_filters(query, me_type, me_subtype, me_category, variant_class,
-                   annotation, dataset_id, population, min_freq, max_freq, db):
+                   annotation, dataset_id, population, min_freq, max_freq, db,
+                   strand=None, chrom=None):
     """Apply optional filters to an insertions query.
 
     This is shared between the list endpoint and the region endpoint so
     filtering logic isn't duplicated.
+
+    MULTI-VALUE PARAMS (strand, chrom):
+        Both accept comma-separated values, e.g. strand="+,-" or chrom="chr1,chr2".
+        A single value uses an equality check (faster); multiple values use SQL IN.
+        This lets the Batch Search frontend pass all selected checkboxes in one param.
     """
     if me_type:
         query = query.filter(Insertion.me_type == me_type)
@@ -61,6 +67,32 @@ def _apply_filters(query, me_type, me_subtype, me_category, variant_class,
         query = query.filter(Insertion.annotation == annotation)
     if dataset_id:
         query = query.filter(Insertion.dataset_id == dataset_id)
+
+    # Strand filter — accepts "+" | "-" | "null" or comma-separated combos.
+    # "null" is stored as SQL NULL in the DB, so we translate it specially.
+    if strand:
+        values = [v.strip() for v in strand.split(",")]
+        null_included = "null" in values
+        non_null = [v for v in values if v != "null"]
+        if null_included and non_null:
+            # e.g. strand="+,null" → strand IN ('+') OR strand IS NULL
+            query = query.filter(
+                (Insertion.strand.in_(non_null)) | (Insertion.strand.is_(None))
+            )
+        elif null_included:
+            query = query.filter(Insertion.strand.is_(None))
+        elif len(non_null) == 1:
+            query = query.filter(Insertion.strand == non_null[0])
+        else:
+            query = query.filter(Insertion.strand.in_(non_null))
+
+    # Chrom filter — accepts "chr1" or comma-separated "chr1,chr2,chrX".
+    if chrom:
+        values = [v.strip() for v in chrom.split(",")]
+        if len(values) == 1:
+            query = query.filter(Insertion.chrom == values[0])
+        else:
+            query = query.filter(Insertion.chrom.in_(values))
 
     # Population frequency filter — requires joining the pop_frequencies table
     if population:
@@ -87,6 +119,8 @@ def list_insertions(
     population: str | None = None,
     min_freq: float | None = None,
     max_freq: float | None = None,
+    strand: str | None = None,
+    chrom: str | None = None,
     limit: int = Query(default=50, le=1000, ge=1),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -97,10 +131,13 @@ def list_insertions(
         /v1/insertions?me_type=ALU&limit=10
         /v1/insertions?population=EUR&min_freq=0.1&variant_class=Common
         /v1/insertions?annotation=INTRONIC&me_type=LINE1
+        /v1/insertions?strand=%2B            (+ must be URL-encoded)
+        /v1/insertions?chrom=chr1,chr2,chrX  (comma-separated for multiple)
     """
     query = db.query(Insertion)
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
-                           annotation, dataset_id, population, min_freq, max_freq, db)
+                           annotation, dataset_id, population, min_freq, max_freq, db,
+                           strand=strand, chrom=chrom)
 
     total = query.count()
     results = query.order_by(Insertion.id).offset(offset).limit(limit).all()
@@ -151,17 +188,20 @@ def get_insertions_by_region(
     population: str | None = None,
     min_freq: float | None = None,
     max_freq: float | None = None,
+    strand: str | None = None,
+    db: Session = Depends(get_db),
     limit: int = Query(default=50, le=1000, ge=1),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
 ):
     """Get insertions in a genomic region.
 
     The region format is chrom:start-end (e.g. chr1:1000000-5000000).
+    The chrom filter is not available here (chrom is part of the region itself).
 
     Examples:
         /v1/insertions/region/hg38/chr1:1000000-5000000
         /v1/insertions/region/hg38/chr1:1000000-5000000?me_type=ALU
+        /v1/insertions/region/hg38/chr1:1000000-5000000?strand=%2B
     """
     # Parse region string like "chr1:1000000-5000000"
     match = re.match(r"^(chr[\w]+):(\d+)-(\d+)$", region)
@@ -171,18 +211,19 @@ def get_insertions_by_region(
             detail=f"Invalid region format: '{region}'. Expected format: chr1:1000000-5000000",
         )
 
-    chrom = match.group(1)
+    region_chrom = match.group(1)
     start = int(match.group(2))
     end = int(match.group(3))
 
     query = db.query(Insertion).filter(
         Insertion.assembly == assembly,
-        Insertion.chrom == chrom,
+        Insertion.chrom == region_chrom,
         Insertion.start >= start,
         Insertion.end <= end,
     )
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
-                           annotation, dataset_id, population, min_freq, max_freq, db)
+                           annotation, dataset_id, population, min_freq, max_freq, db,
+                           strand=strand)
 
     total = query.count()
     results = query.order_by(Insertion.start).offset(offset).limit(limit).all()

@@ -304,3 +304,68 @@ class TestExport:
     def test_invalid_format(self, client):
         r = client.get("/v1/export?format=fasta")
         assert r.status_code == 400
+
+
+# ── Strand filter ─────────────────────────────────────────────────────────
+# Fixture strands: A0000001=+, A0000008=+, A0000116=-, L0000001=+, S0000001=-
+
+class TestStrandFilter:
+    def test_positive_strand_returns_correct_count(self, client):
+        r = client.get("/v1/insertions?strand=%2B")  # + URL-encoded
+        assert r.status_code == 200
+        assert r.json()["total"] == 3  # A0000001, A0000008, L0000001
+
+    def test_negative_strand_returns_correct_count(self, client):
+        r = client.get("/v1/insertions?strand=-")
+        assert r.status_code == 200
+        assert r.json()["total"] == 2  # A0000116, S0000001
+
+    def test_multi_strand_comma_separated(self, client):
+        """Comma-separated strands should act as OR (IN clause)."""
+        r = client.get("/v1/insertions?strand=%2B%2C-")  # +,- URL-encoded
+        assert r.status_code == 200
+        assert r.json()["total"] == 5  # all rows
+
+    def test_strand_results_match_filter(self, client):
+        """Every returned row should have the requested strand."""
+        r = client.get("/v1/insertions?strand=-&limit=10")
+        for row in r.json()["results"]:
+            assert row["strand"] == "-"
+
+    def test_export_with_strand_filter(self, client):
+        """Export endpoint should respect the strand param."""
+        r = client.get("/v1/export?format=csv&strand=-")
+        lines = r.text.strip().splitlines()
+        assert len(lines) == 3  # header + 2 negative-strand rows
+
+
+# ── Chrom filter ──────────────────────────────────────────────────────────
+# Fixture: all 5 rows are on chr1
+
+class TestChromFilter:
+    def test_single_chrom_match(self, client):
+        r = client.get("/v1/insertions?chrom=chr1")
+        assert r.status_code == 200
+        assert r.json()["total"] == 5
+
+    def test_single_chrom_no_match(self, client):
+        r = client.get("/v1/insertions?chrom=chr99")
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
+
+    def test_multi_chrom_comma_separated(self, client):
+        """Selecting chr1 and chr2 should return all chr1 rows (chr2 has none)."""
+        r = client.get("/v1/insertions?chrom=chr1,chr2")
+        assert r.status_code == 200
+        assert r.json()["total"] == 5
+
+    def test_chrom_combined_with_strand(self, client):
+        """chrom and strand filters should stack (AND logic)."""
+        r = client.get("/v1/insertions?chrom=chr1&strand=-")
+        assert r.status_code == 200
+        assert r.json()["total"] == 2  # A0000116 + S0000001
+
+    def test_export_with_chrom_filter(self, client):
+        r = client.get("/v1/export?format=csv&chrom=chr1")
+        lines = r.text.strip().splitlines()
+        assert len(lines) == 6  # header + 5 rows

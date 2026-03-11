@@ -38,11 +38,13 @@ router = APIRouter(prefix="/v1", tags=["export"])
 
 
 def _get_filtered_insertions(db, me_type, me_subtype, me_category, variant_class,
-                              annotation, dataset_id, population, min_freq, max_freq):
+                              annotation, dataset_id, population, min_freq, max_freq,
+                              strand=None, chrom=None):
     """Build and execute a filtered query, returning all matching insertions."""
     query = db.query(Insertion)
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
-                           annotation, dataset_id, population, min_freq, max_freq, db)
+                           annotation, dataset_id, population, min_freq, max_freq, db,
+                           strand=strand, chrom=chrom)
     return query.order_by(Insertion.chrom, Insertion.start).all()
 
 
@@ -129,6 +131,8 @@ def export_insertions(
     population: str | None = None,
     min_freq: float | None = None,
     max_freq: float | None = None,
+    strand: str | None = None,
+    chrom: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Export insertions in BED, VCF, or CSV format.
@@ -138,7 +142,7 @@ def export_insertions(
     Examples:
         /v1/export?format=bed&me_type=ALU
         /v1/export?format=vcf&population=EUR&min_freq=0.1
-        /v1/export?format=csv
+        /v1/export?format=csv&strand=%2B&chrom=chr1,chr2
     """
     if format not in FORMATS:
         raise HTTPException(
@@ -149,6 +153,7 @@ def export_insertions(
     insertions = _get_filtered_insertions(
         db, me_type, me_subtype, me_category, variant_class,
         annotation, dataset_id, population, min_freq, max_freq,
+        strand=strand, chrom=chrom,
     )
 
     converter, media_type, extension = FORMATS[format]
