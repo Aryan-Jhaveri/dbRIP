@@ -1,0 +1,39 @@
+[project]
+name = "dbrip-api"
+version = "0.1.0"
+description = "Read-only API for the dbRIP database of retrotransposon insertion polymorphisms"
+requires-python = ">=3.11"
+dependencies = [
+    # API
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    # Database
+    "sqlalchemy>=2.0",
+    # Validation
+    "pydantic>=2.0",
+    # Ingest
+    "pandas>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",          # FastAPI TestClient needs this
+    "ruff>=0.8",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*", "ingest*", "cli*", "mcp*"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
