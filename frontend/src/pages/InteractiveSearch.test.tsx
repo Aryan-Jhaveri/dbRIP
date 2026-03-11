@@ -2,12 +2,14 @@
  * Tests for the InteractiveSearch page.
  *
  * WHAT THESE TESTS VERIFY:
- *   - Renders the search bar
- *   - Renders the Download CSV link
+ *   - Renders the search bar, download link, column headers
  *   - Shows "Loading..." while data is being fetched
  *   - Renders the data table with results after loading
- *   - Debounces search input (doesn't fire immediately)
- *   - Shows the Clear button when search has a value
+ *   - Shows error message when API returns no data
+ *   - Client-side filtering: search hides non-matching rows after debounce
+ *   - Client-side filtering: search status message shows match count
+ *   - Client-side filtering: Clear button resets search and shows all rows
+ *   - Client-side filtering: rows are NOT filtered before debounce fires
  *
  * HOW MOCKING WORKS:
  *   We mock the useInsertions hook (not the fetch call) because:
@@ -17,10 +19,21 @@
  *
  *   vi.mock("../hooks/useInsertions") replaces the real hook with a mock.
  *   vi.mocked(useInsertions).mockReturnValue(...) sets what the mock returns.
+ *
+ * WHY vi.advanceTimersByTime(300)?
+ *   The search bar has a 300ms debounce — typing "ALU" doesn't immediately
+ *   filter results. We use Vitest's fake timers to skip past the debounce
+ *   so we can test the filtered state without waiting real milliseconds.
+ *   act() wraps the timer advance because it triggers a React state update.
+ *
+ * WHAT'S NOT TESTED HERE:
+ *   - The regex filter logic itself — that's in utils/filterRowsByRegex.test.ts
+ *   - API calls — the hook is mocked, so no HTTP happens
+ *   - Pagination — tested in DataTable.test.tsx
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InteractiveSearch from "./InteractiveSearch";
 import { useInsertions } from "../hooks/useInsertions";
@@ -38,7 +51,11 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
-/** Sample API response for testing. */
+/**
+ * Sample API response for testing.
+ * Two ALU insertions with different annotations (TERMINATOR vs INTRONIC)
+ * so we can verify that searching "INTRONIC" hides the TERMINATOR row.
+ */
 const mockData = {
   total: 2,
   limit: 50,
@@ -84,7 +101,15 @@ const mockData = {
 describe("InteractiveSearch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Use fake timers so we can control the 300ms debounce
+    vi.useFakeTimers();
   });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // ── Basic rendering tests ───────────────────────────────────────────
 
   it("renders the search bar", () => {
     vi.mocked(useInsertions).mockReturnValue({
@@ -132,21 +157,6 @@ describe("InteractiveSearch", () => {
     expect(screen.getByText("Showing 1 to 2 of 2 entries")).toBeInTheDocument();
   });
 
-  it("shows Clear button when search input has a value", () => {
-    vi.mocked(useInsertions).mockReturnValue({
-      data: mockData,
-      isLoading: false,
-    } as unknown as ReturnType<typeof useInsertions>);
-
-    renderWithProviders(<InteractiveSearch />);
-    const searchInput = screen.getByPlaceholderText(/regex, case-insensitive/i);
-    fireEvent.change(searchInput, { target: { value: "ALU" } });
-    // Clear button should appear (it shows when searchInput is non-empty,
-    // but actually our component shows it when searchQuery is non-empty,
-    // which requires the debounce to fire — so let's just check the input value)
-    expect(searchInput).toHaveValue("ALU");
-  });
-
   it("shows error message when API returns no data", () => {
     vi.mocked(useInsertions).mockReturnValue({
       data: undefined,
@@ -155,5 +165,99 @@ describe("InteractiveSearch", () => {
 
     renderWithProviders(<InteractiveSearch />);
     expect(screen.getByText(/unable to load data/i)).toBeInTheDocument();
+  });
+
+  // ── Client-side search filtering tests ──────────────────────────────
+
+  it("filters table rows after debounce fires", () => {
+    vi.mocked(useInsertions).mockReturnValue({
+      data: mockData,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInsertions>);
+
+    renderWithProviders(<InteractiveSearch />);
+
+    // Both rows visible before search
+    expect(screen.getByText("A0000001")).toBeInTheDocument();
+    expect(screen.getByText("A0000002")).toBeInTheDocument();
+
+    // Type "INTRONIC" in the search bar
+    const searchInput = screen.getByPlaceholderText(/regex, case-insensitive/i);
+    fireEvent.change(searchInput, { target: { value: "INTRONIC" } });
+
+    // Advance past the 300ms debounce so searchQuery updates
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    // Now only the INTRONIC row should be visible
+    expect(screen.queryByText("A0000001")).not.toBeInTheDocument();
+    expect(screen.getByText("A0000002")).toBeInTheDocument();
+  });
+
+  it("shows search status message with match count", () => {
+    vi.mocked(useInsertions).mockReturnValue({
+      data: mockData,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInsertions>);
+
+    renderWithProviders(<InteractiveSearch />);
+
+    // Type a search term and wait for debounce
+    const searchInput = screen.getByPlaceholderText(/regex, case-insensitive/i);
+    fireEvent.change(searchInput, { target: { value: "INTRONIC" } });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    // Status message should show "1 of 2 rows on this page"
+    expect(screen.getByText(/1 of 2 rows on this page/)).toBeInTheDocument();
+  });
+
+  it("shows Clear button after debounce and clears search when clicked", () => {
+    vi.mocked(useInsertions).mockReturnValue({
+      data: mockData,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInsertions>);
+
+    renderWithProviders(<InteractiveSearch />);
+
+    // Type a search and wait for debounce
+    const searchInput = screen.getByPlaceholderText(/regex, case-insensitive/i);
+    fireEvent.change(searchInput, { target: { value: "INTRONIC" } });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    // Clear button should be visible
+    const clearButton = screen.getByText("Clear");
+    expect(clearButton).toBeInTheDocument();
+
+    // Click Clear — both rows should reappear
+    fireEvent.click(clearButton);
+    // Advance timers for the debounce on the cleared input
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("A0000001")).toBeInTheDocument();
+    expect(screen.getByText("A0000002")).toBeInTheDocument();
+  });
+
+  it("does not filter before debounce fires", () => {
+    vi.mocked(useInsertions).mockReturnValue({
+      data: mockData,
+      isLoading: false,
+    } as unknown as ReturnType<typeof useInsertions>);
+
+    renderWithProviders(<InteractiveSearch />);
+
+    // Type "INTRONIC" but DON'T advance timers
+    const searchInput = screen.getByPlaceholderText(/regex, case-insensitive/i);
+    fireEvent.change(searchInput, { target: { value: "INTRONIC" } });
+
+    // Both rows should still be visible (debounce hasn't fired)
+    expect(screen.getByText("A0000001")).toBeInTheDocument();
+    expect(screen.getByText("A0000002")).toBeInTheDocument();
   });
 });
