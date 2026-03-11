@@ -31,3 +31,5 @@ CLAUDE.md
 dbri*{shm,wal,sqlite}
 
 
+*shm
+*wal
