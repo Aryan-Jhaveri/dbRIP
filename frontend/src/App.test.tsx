@@ -68,6 +68,7 @@ describe("App", () => {
   it("switches to Batch Search tab when clicked", () => {
     renderWithProviders(<App />);
     fireEvent.click(screen.getByText("Batch Search"));
-    expect(screen.getByText(/filter by category/i)).toBeInTheDocument();
+    // BatchSearch renders checkbox groups — check for one of them
+    expect(screen.getByText("By Category:")).toBeInTheDocument();
   });
 });

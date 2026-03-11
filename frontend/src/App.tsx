@@ -19,8 +19,8 @@
  */
 
 import { useState } from "react";
-/* import InteractiveSearch from "./pages/InteractiveSearch";*/
 import InteractiveSearch from "./pages/InteractiveSearch";
+import BatchSearch from "./pages/BatchSearch";
 
 /**
  * Tab identifiers — used to track which tab is currently active.
@@ -79,12 +79,7 @@ export default function App() {
             (Component coming soon.)
           </p>
         )}
-        {activeTab === "batch" && (
-          <p className="text-sm">
-            Batch Search — filter by category, ME family, annotation, strand,
-            and chromosome. (Component coming soon.)
-          </p>
-        )}
+        {activeTab === "batch" && <BatchSearch />}
       </div>
     </div>
   );
