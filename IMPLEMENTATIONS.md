@@ -5,7 +5,28 @@ Below are the next things to build, roughly in priority order.
 
 
 ## Other To-Do
-- [ ] Add Predefined values to exports? https://fastapi.tiangolo.com/tutorial/path-params/#predefined-values, so vcf, bed calls are restrcited to certain output types. Also look inot adding predefined values to other dropdowns for API
+
+- Fix interactive search and filtering not working → Related to the InteractiveSearch + client-side regex filter work.     
+    - Even if a search item interactive search is added say 66, it will pull some results
+    - Writing something in the seearch field doesn't work, in terms of filtering truly
+    - If for instace INTRONIC is entered in search bar, PAges 1-29 will show only INTRONIC entries, but pages 30-32 are empty, with enteries returning in from page 34, i.e, when someone types something and filters are on, even then sometimes the filters show empty pages.
+
+- The should ideally either be exactly to the total table lentths and be dynamic, or a simple string that shows approxmiate to leave room for people to add enteries, and not have the description not be exactly factual.
+
+- Add row selection → Users can select rows and copy to clipboard or download as CSV.                           
+                
+- Allow filter buttons on column headers → Column header filter dropdowns (e.g., filter by ALU, SVA) + sort     
+
+- Add the ability to jump to specific pages in interactive search
+
+- Add mkdocs (docs/*md's) to the frontend
+    - Add docs and guide for cli
+    - Add docs and guide for API
+    - Link github
+
+- File search page is empty, and needs the fueature to upload files to find matching enteries
+
+- - [ ] Add Predefined values to exports? https://fastapi.tiangolo.com/tutorial/path-params/#predefined-values, so vcf, bed calls are restrcited to certain output types. Also look inot adding predefined values to other dropdowns for API
 
 - [ ] Look into enums for plus minus strand, to format them as
 
@@ -21,27 +42,7 @@ Below are the next things to build, roughly in priority order.
 - [ ] For error handling in query parameters, need fall backs or docs for,
   
   Question: if the user doesn't enter `?` or doesnt enter relevant paramenters after `?`, how do different calls handle this gracefully? Do the calls tell what the default fallbacks are, do they need to be removed. 
-
-- Move entry filters to the top → This is about page size selector and page number (pagination controls) - move them to the top of the table, not just the bottom.                                                       
            
-- Fix interactive search not working → Related to the InteractiveSearch + client-side regex filter work.     
-    - Even if a search item interactive search is added say 66, it will pull some results
-    - Writing something in the seearch field doesn't work, in terms of filtering truly
-                                                                                       
-- Add row selection → Users can select rows and copy to clipboard or download as CSV.                           
-                
-- Allow filter buttons on column headers → Column header filter dropdowns (e.g., filter by ALU, SVA) + sort     
-
-- Add the ability to jump to specific pages in interactive search
-
-- Add mkdocs (docs/*md's) to the frontend
-    - Add docs and guide for cli
-    - Add docs and guide for API
-    - Link github
-
-- File search page is empty, and needs the fueature to upload files to find matching enteries
-
-
 ---
 
 ## 1. MCP Server — Let Claude Query the Database
