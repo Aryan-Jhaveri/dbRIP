@@ -1,0 +1,99 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Dataset Manifest: dbRIP v1
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# This file describes the dbRIP CSV so the ingest pipeline knows how to parse it.
+#
+# HOW IT WORKS:
+#   1. scripts/ingest.py reads this YAML
+#   2. It dynamically imports the class specified in `loader_class`
+#      (ingest.dbrip.DbRIPLoader — defined in ingest/dbrip.py)
+#   3. That loader class inherits from ingest.base.BaseLoader, which defines
+#      the contract: load_raw() → normalize() → to_insertions() + to_pop_frequencies()
+#   4. The loader uses `column_map` below to rename CSV columns → DB columns,
+#      `null_strings` to clean bad values, and `population_columns` to know
+#      which CSV columns are allele frequencies that get melted into long format.
+#
+# WHY A MANIFEST?
+#   - Decouples the CSV format from the database schema.
+#   - Adding a new dataset (e.g., euL1db) = write a new YAML + a new loader class.
+#     Nothing else in the codebase changes.
+#   - The manifest is stored in the DB alongside the data for reproducibility
+#     (you can always see exactly how a dataset was loaded).
+#
+# USAGE:
+#   python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
+#   python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml --dry-run
+#   python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml --csv data/raw/corrections.csv
+# ──────────────────────────────────────────────────────────────────────────────
+
+id: dbrip_v1
+version: "1.0"
+label: "dbRIP — Database of Retrotransposon Insertion Polymorphisms"
+source_url: "https://lianglab.shinyapps.io/shinydbRIP/"
+assembly: hg38
+coordinate_basis: 1-based
+csv_path: data/raw/dbRIP_all.csv
+loader_class: ingest.dbrip.DbRIPLoader
+
+# Maps CSV column names → internal DB column names.
+# Only these columns are loaded; everything else in the CSV is ignored.
+column_map:
+  ID: id
+  Chromosome: chrom
+  Start: start
+  End: end
+  ME_category: me_category
+  ME_type: me_type
+  RIP_type: rip_type
+  ME_subtype: me_subtype
+  ME_length: me_length
+  Strand: strand
+  TSD: tsd
+  Annotation: annotation
+  Variant_Class: variant_class
+
+# Strings in the CSV that should be treated as NULL.
+null_strings: ["null", "NULL", "", "None"]
+
+# Population frequency columns — these get melted from wide to long format
+# into the pop_frequencies table (one row per insertion × population).
+#
+# "individual" = 26 populations from 1000 Genomes (e.g., CEU, YRI, JPT)
+# "super"      = 5 super-populations (AFR, EUR, etc.) + aggregates (All, Non_African)
+population_columns:
+  individual:
+    - ACB
+    - ASW
+    - BEB
+    - CDX
+    - CEU
+    - CHB
+    - CHS
+    - CLM
+    - ESN
+    - FIN
+    - GBR
+    - GIH
+    - GWD
+    - IBS
+    - ITU
+    - JPT
+    - KHV
+    - LWK
+    - MSL
+    - MXL
+    - PEL
+    - PJL
+    - PUR
+    - STU
+    - TSI
+    - YRI
+  super:
+    - AFR
+    - AMR
+    - EAS
+    - EUR
+    - SAS
+    - Non_African
+    - All
