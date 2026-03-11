@@ -21,6 +21,25 @@ if necessary
 - [ ] For error handling in query parameters, need fall backs or docs for,
 Question: if the user doesn't enter `?` or doesnt enter relevant paramenters after `?`, how do different calls handle this gracefully? Do the calls tell what the default fallbacks are, do they need to be removed. 
 
+- Move entry filters to the top → This is about page size selector and page number (pagination controls) - move them to the top of the table, not just the bottom.                                                       
+           
+- Fix interactive search not working → Related to the InteractiveSearch + client-side regex filter work.     
+    - Even if a search item interactive search is added say 66, it will pull some results
+    - Writing something in the seearch field doesn't work, in terms of filtering truly
+                                                                                       
+- Add row selection → Users can select rows and copy to clipboard or download as CSV.                           
+                
+- Allow filter buttons on column headers → Column header filter dropdowns (e.g., filter by ALU, SVA) + sort     
+
+- Add the ability to jump to specific pages in interactive search
+
+- Add mkdocs (docs/*md's) to the frontend
+    - Add docs and guide for cli
+    - Add docs and guide for API
+    - Link github
+
+- File search page is empty, and needs the fueature to upload files to find matching enteries
+
 
 
 ---
