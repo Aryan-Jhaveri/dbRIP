@@ -79,7 +79,7 @@ export interface DataTableProps<TData> {
 
 // ── Available page sizes ─────────────────────────────────────────────────
 // These match the options in the Shiny app's DataTable (10, 25, 50, 100).
-const PAGE_SIZES = [10, 25, 50, 100];
+const PAGE_SIZES = [25, 50, 100, 500, 1000];
 
 // ── Component ────────────────────────────────────────────────────────────
 
@@ -115,6 +115,62 @@ export default function DataTable<TData>({
 
   return (
     <div>
+           {/* ── Pagination controls ────────────────────────────────────────── */}
+      <div className="mt-2 flex items-center justify-between text-sm">
+        {/* Left side: showing X–Y of Z */}
+        <span>
+          {total === 0
+            ? "No results"
+            : `Showing ${firstRow} to ${lastRow} of ${total.toLocaleString()} entries`}
+        </span>
+
+        {/* Right side: page size selector + prev/next buttons */}
+        <div className="flex items-center gap-2">
+          {/* Page size dropdown */}
+          <label>
+            Show{" "}
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                // When page size changes, reset to first page
+                onPaginationChange(0, Number(e.target.value));
+              }}
+              className="border border-black px-1 py-0.5"
+            >
+              {PAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>{" "}
+            entries
+          </label>
+
+          {/* Previous button */}
+          <button
+            onClick={() => onPaginationChange(pageIndex - 1, pageSize)}
+            disabled={pageIndex === 0}
+            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+
+          {/* Current page indicator */}
+          <span>
+            Page {total === 0 ? 0 : pageIndex + 1} of {pageCount}
+          </span>
+
+          {/* Next button */}
+          <button
+            onClick={() => onPaginationChange(pageIndex + 1, pageSize)}
+            disabled={pageIndex >= pageCount - 1}
+            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse border border-black text-sm">
@@ -174,61 +230,6 @@ export default function DataTable<TData>({
         </table>
       </div>
 
-      {/* ── Pagination controls ────────────────────────────────────────── */}
-      <div className="mt-2 flex items-center justify-between text-sm">
-        {/* Left side: showing X–Y of Z */}
-        <span>
-          {total === 0
-            ? "No results"
-            : `Showing ${firstRow} to ${lastRow} of ${total.toLocaleString()} entries`}
-        </span>
-
-        {/* Right side: page size selector + prev/next buttons */}
-        <div className="flex items-center gap-2">
-          {/* Page size dropdown */}
-          <label>
-            Show{" "}
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                // When page size changes, reset to first page
-                onPaginationChange(0, Number(e.target.value));
-              }}
-              className="border border-black px-1 py-0.5"
-            >
-              {PAGE_SIZES.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>{" "}
-            entries
-          </label>
-
-          {/* Previous button */}
-          <button
-            onClick={() => onPaginationChange(pageIndex - 1, pageSize)}
-            disabled={pageIndex === 0}
-            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Previous
-          </button>
-
-          {/* Current page indicator */}
-          <span>
-            Page {total === 0 ? 0 : pageIndex + 1} of {pageCount}
-          </span>
-
-          {/* Next button */}
-          <button
-            onClick={() => onPaginationChange(pageIndex + 1, pageSize)}
-            disabled={pageIndex >= pageCount - 1}
-            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
-          >
-            Next
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

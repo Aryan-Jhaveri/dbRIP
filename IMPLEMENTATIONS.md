@@ -9,17 +9,18 @@ Below are the next things to build, roughly in priority order.
 
 - [ ] Look into enums for plus minus strand, to format them as
 
-class Strand(str, Enum):
-    plus = "+"
-    minus = "-"
+        class Strand(str, Enum):
+            plus = "+"
+            minus = "-"
 
-# If you need to send "+" to a different tool:
-raw_strand = Strand.plus.value  # Returns "+"
+        # If you need to send "+" to a different tool:
+        raw_strand = Strand.plus.value  # Returns "+"
 
-if necessary
+    if necessary
 
 - [ ] For error handling in query parameters, need fall backs or docs for,
-Question: if the user doesn't enter `?` or doesnt enter relevant paramenters after `?`, how do different calls handle this gracefully? Do the calls tell what the default fallbacks are, do they need to be removed. 
+  
+  Question: if the user doesn't enter `?` or doesnt enter relevant paramenters after `?`, how do different calls handle this gracefully? Do the calls tell what the default fallbacks are, do they need to be removed. 
 
 - Move entry filters to the top → This is about page size selector and page number (pagination controls) - move them to the top of the table, not just the bottom.                                                       
            
@@ -39,7 +40,6 @@ Question: if the user doesn't enter `?` or doesnt enter relevant paramenters aft
     - Link github
 
 - File search page is empty, and needs the fueature to upload files to find matching enteries
-
 
 
 ---

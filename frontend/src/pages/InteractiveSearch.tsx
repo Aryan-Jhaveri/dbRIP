@@ -195,6 +195,17 @@ export default function InteractiveSearch() {
         </p>
       )}
 
+      {/* ── Download button ────────────────────────────────────────────── */}
+      <div className="mt-4">
+        <a
+          href={exportUrl}
+          download
+          className="border border-black px-3 py-1 text-sm no-underline hover:bg-gray-100 inline-block"
+        >
+          Download CSV
+        </a>
+      </div>
+
       {/* ── Data table ─────────────────────────────────────────────────── */}
       {/* We pass filteredResults (not raw data.results) so the table only
           shows rows that match the search. The total is still the server-side
@@ -209,16 +220,7 @@ export default function InteractiveSearch() {
         isLoading={isLoading}
       />
 
-      {/* ── Download button ────────────────────────────────────────────── */}
-      <div className="mt-4">
-        <a
-          href={exportUrl}
-          download
-          className="border border-black px-3 py-1 text-sm no-underline hover:bg-gray-100 inline-block"
-        >
-          Download CSV
-        </a>
-      </div>
+      
     </div>
   );
 }
