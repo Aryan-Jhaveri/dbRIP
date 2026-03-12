@@ -235,14 +235,25 @@ export default function DataTable<TData>({
     isDraggingRef.current = true;
 
     if (e.shiftKey && lastRowClickRef.current !== null) {
-      // Shift+press: expand selection to the range — always "select" direction.
+      // Shift+press: apply the TARGET row's current state to the whole range.
+      //
+      // Standard UX (Gmail, Windows Explorer, Finder):
+      //   - Shift+clicking an UNSELECTED row → SELECT everything in the range
+      //   - Shift+clicking a SELECTED row    → DESELECT everything in the range
+      //
+      // This mirrors what the user sees: the row they're clicking on flips, and
+      // the range catches up to match. The anchor row is just a boundary marker.
       const lo = Math.min(lastRowClickRef.current, rowIndex);
       const hi = Math.max(lastRowClickRef.current, rowIndex);
-      dragModeRef.current = "select";
+      const shouldSelect = !selectedIds.has(rowId); // target row's state decides direction
+      dragModeRef.current = shouldSelect ? "select" : "deselect";
       setSelectedIds((prev) => {
         const next = new Set(prev);
         rows.forEach((r) => {
-          if (r.index >= lo && r.index <= hi) next.add(r.id);
+          if (r.index >= lo && r.index <= hi) {
+            if (shouldSelect) next.add(r.id);
+            else next.delete(r.id);
+          }
         });
         return next;
       });
@@ -423,7 +434,11 @@ export default function DataTable<TData>({
                     - indeterminate = some (but not all) rows expanded
                     - unchecked = no rows expanded */}
                 {renderExpandedRow && (
-                  <th className="border border-black px-2 py-1 w-8">
+                  <th className="border border-black px-2 py-1 text-center align-middle">
+                    {/* "Pop Freq" label stacked above the expand-all checkbox */}
+                    <span className="block text-xs font-semibold whitespace-nowrap mb-0.5">
+                      Pop Freq
+                    </span>
                     <input
                       type="checkbox"
                       checked={expandedIds.size === rows.length && rows.length > 0}
