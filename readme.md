@@ -113,8 +113,7 @@ dbRIP-API/
 ├── docs/                              ← MkDocs source pages (served by the frontend Docs tab)
 ├── alembic/                           ← Database migrations (placeholder — see alembic/README.md)
 ├── mcp/                               ← MCP server for Claude (planned)
-├── pyproject.toml                     ← Dependencies and project config
-└── CLAUDE.md                          ← Project context for Claude Code
+└── pyproject.toml                     ← Dependencies and project config
 ```
 
 ## Core Design Principles
