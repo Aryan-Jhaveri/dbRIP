@@ -2,7 +2,7 @@
 
 Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project. Provided as a web app, REST API, and command-line tool.
 
-The hosted version is available at: **`<your-deploy-url>`**
+Currently hosting on : https://dbrip-api.onrender.com/ {Mar-12/2025 | API works from there too}
 
 ---
 
