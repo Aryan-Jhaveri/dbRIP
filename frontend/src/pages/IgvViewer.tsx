@@ -555,11 +555,23 @@ export default function IgvViewer({ locus }: IgvViewerProps) {
           This is expected behavior — igv's styles are scoped to its own elements
           and should not affect the rest of the page.
       */}
-      {/* clamp(350px, 60vh, 600px): never smaller than 350px (enough for igv to
-          render), scales with viewport height on phones, caps at 600px on desktop. */}
+      {/*
+        * colorScheme: "light" overrides the inherited "dark" color-scheme that
+        * html.dark sets globally. Without this, the browser fills igv's elements
+        * that don't set their own background-color with the dark system color,
+        * producing the dark-navy void visible in dark mode. igv.js's own CSS
+        * is already light (navbar #f3f3f3, tracks white) — we just need the
+        * system default background to also be white inside this container.
+        * background: "white" ensures the container itself is always white.
+        */}
       <div
         ref={containerRef}
-        style={{ width: "100%", height: "clamp(350px, 60vh, 600px)" }}
+        style={{
+          width: "100%",
+          height: "clamp(350px, 60vh, 600px)",
+          colorScheme: "light",
+          background: "white",
+        }}
       />
     </div>
   );
