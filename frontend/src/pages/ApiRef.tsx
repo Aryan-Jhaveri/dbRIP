@@ -16,13 +16,20 @@
  *
  * HOW THIS FILE CONNECTS TO THE REST:
  *   - Imported and rendered by App.tsx when activeTab === "api-ref"
- *   - No hooks, no state, no API calls
+ *   - Uses local useState in Endpoint for collapsible open/closed state;
+ *     no API calls are made
  */
+
+import { useState } from "react";
 
 // ── Sub-components ────────────────────────────────────────────────────────
 
 /**
- * Endpoint — documents a single API endpoint.
+ * Endpoint — documents a single API endpoint as a collapsible section.
+ *
+ * Clicking the header row (method badge + path + description) toggles the
+ * params table and curl example open and closed. Collapsed by default so
+ * the page loads as a compact list — expand only what you need.
  *
  * @param method   HTTP verb ("GET", "POST")
  * @param path     URL path, e.g. /v1/insertions
@@ -40,14 +47,40 @@ function Endpoint({
   desc: string;
   children?: React.ReactNode;
 }) {
+  // Collapsed by default — page starts as a compact list of endpoints.
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="mb-8">
-      <div className="flex items-baseline gap-2">
-        <span className="text-xs font-semibold border border-black dark:border-gray-500 px-1">{method}</span>
-        <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1">{path}</code>
-      </div>
-      <p className="text-sm mt-1">{desc}</p>
-      {children && <div className="mt-2">{children}</div>}
+    <div className="mb-3 border border-black dark:border-gray-500">
+      {/*
+       * Clickable header — clicking anywhere in this row toggles open/closed.
+       * Using a <button> (not a <div onClick>) for keyboard + screen-reader
+       * accessibility. aria-expanded tells assistive tech the current state.
+       */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full text-left px-3 py-2 flex items-start gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+        aria-expanded={open}
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs font-semibold border border-black dark:border-gray-500 px-1">
+              {method}
+            </span>
+            <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1">{path}</code>
+          </div>
+          <p className="text-sm mt-1">{desc}</p>
+        </div>
+        {/* Chevron — points right when collapsed, down when expanded */}
+        <span className="text-xs shrink-0 mt-1 select-none">{open ? "▾" : "▸"}</span>
+      </button>
+
+      {/* Collapsible details — params table + curl example */}
+      {open && children && (
+        <div className="px-3 pt-2 pb-3 border-t border-black dark:border-gray-500">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

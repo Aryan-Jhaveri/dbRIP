@@ -11,13 +11,20 @@
  *
  * HOW THIS FILE CONNECTS TO THE REST:
  *   - Imported and rendered by App.tsx when activeTab === "cli-ref"
- *   - No hooks, no state, no API calls
+ *   - Uses local useState in CliCommand for collapsible open/closed state;
+ *     no API calls are made
  */
+
+import { useState } from "react";
 
 // ── Sub-component ─────────────────────────────────────────────────────────
 
 /**
- * CliCommand — documents a single CLI subcommand.
+ * CliCommand — documents a single CLI subcommand as a collapsible section.
+ *
+ * Clicking the header row (command name + description) toggles the flags
+ * table and example block open and closed. Collapsed by default so the
+ * page starts as a compact list of commands — expand only what you need.
  *
  * @param name     The subcommand as typed, e.g. "dbrip search"
  * @param desc     One-line description of what it does
@@ -36,34 +43,58 @@ function CliCommand({
   flags: [string, string][];
   example?: string;
 }) {
+  // Collapsed by default — page starts as a compact list of commands.
+  const [open, setOpen] = useState(false);
+  const hasDetails = flags.length > 0 || example !== undefined;
+
   return (
-    <div className="mb-8">
-      <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1 font-semibold">{name}</code>
-      <p className="text-sm mt-1">{desc}</p>
-      {flags.length > 0 && (
-        <table className="text-sm border border-black dark:border-gray-500 w-full mt-2">
-          <thead>
-            <tr className="bg-gray-100 dark:bg-gray-800">
-              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Flag</th>
-              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Description</th>
-            </tr>
-          </thead>
-          <tbody>
-            {flags.map(([flag, description]) => (
-              <tr key={flag}>
-                <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800 whitespace-nowrap">
-                  {flag}
-                </td>
-                <td className="border border-black dark:border-gray-500 px-2 py-1">{description}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {example && (
-        <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-1 mt-2 overflow-x-auto">
-          {example}
-        </pre>
+    <div className="mb-3 border border-black dark:border-gray-500">
+      {/*
+       * Clickable header — clicking anywhere in this row toggles open/closed.
+       * Using a <button> for keyboard + screen-reader accessibility.
+       */}
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full text-left px-3 py-2 flex items-start gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+        aria-expanded={open}
+      >
+        <div className="flex-1 min-w-0">
+          <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1 font-semibold">{name}</code>
+          <p className="text-sm mt-1">{desc}</p>
+        </div>
+        {/* Chevron — points right when collapsed, down when expanded */}
+        <span className="text-xs shrink-0 mt-1 select-none">{open ? "▾" : "▸"}</span>
+      </button>
+
+      {/* Collapsible details — flags table + usage example */}
+      {open && hasDetails && (
+        <div className="px-3 pt-2 pb-3 border-t border-black dark:border-gray-500">
+          {flags.length > 0 && (
+            <table className="text-sm border border-black dark:border-gray-500 w-full mt-2">
+              <thead>
+                <tr className="bg-gray-100 dark:bg-gray-800">
+                  <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Flag</th>
+                  <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {flags.map(([flag, description]) => (
+                  <tr key={flag}>
+                    <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800 whitespace-nowrap">
+                      {flag}
+                    </td>
+                    <td className="border border-black dark:border-gray-500 px-2 py-1">{description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {example && (
+            <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-1 mt-2 overflow-x-auto">
+              {example}
+            </pre>
+          )}
+        </div>
       )}
     </div>
   );
@@ -82,13 +113,13 @@ export default function CliRef() {
       </p>
 
       {/* Installation */}
-      <div className="mb-8">
+      <div className="mb-6">
         <p className="text-sm font-semibold mb-1">Installation</p>
         <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-1 overflow-x-auto">
-{`pip install -e ".[cli]"
+{`pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"
 
-# Point the CLI at your API server (defaults to http://localhost:8000):
-export DBRIP_API_URL=http://localhost:8000`}
+# Point the CLI at the hosted server (add to ~/.bashrc or ~/.zshrc):
+export DBRIP_API_URL=https://<your-deploy-url>`}
         </pre>
       </div>
 
