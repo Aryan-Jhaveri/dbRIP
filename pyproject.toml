@@ -17,6 +17,8 @@ dependencies = [
     # CLI
     "typer[all]>=0.12",
     "httpx>=0.27",
+    # File upload support (required by FastAPI for multipart/form-data)
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]

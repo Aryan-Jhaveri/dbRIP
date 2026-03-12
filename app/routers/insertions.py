@@ -27,9 +27,11 @@ HOW THIS FILE CONNECTS TO THE REST OF THE PROJECT:
     - Registered in app/main.py as a router with prefix "/v1"
 """
 
+import csv
+import io
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -62,16 +64,36 @@ def _apply_filters(query, me_type, me_subtype, me_category, variant_class,
         This replaces the old client-side filterRowsByRegex approach, which could only
         search the current page and produced incorrect pagination totals.
     """
+    # me_type, me_category, annotation, variant_class each accept a single value
+    # OR a comma-separated list (e.g. me_type=ALU,SVA).  A single value uses a
+    # faster equality check; multiple values use a SQL IN clause — same pattern
+    # as strand and chrom below.
     if me_type:
-        query = query.filter(Insertion.me_type == me_type)
+        values = [v.strip() for v in me_type.split(",")]
+        if len(values) == 1:
+            query = query.filter(Insertion.me_type == values[0])
+        else:
+            query = query.filter(Insertion.me_type.in_(values))
     if me_subtype:
         query = query.filter(Insertion.me_subtype == me_subtype)
     if me_category:
-        query = query.filter(Insertion.me_category == me_category)
+        values = [v.strip() for v in me_category.split(",")]
+        if len(values) == 1:
+            query = query.filter(Insertion.me_category == values[0])
+        else:
+            query = query.filter(Insertion.me_category.in_(values))
     if variant_class:
-        query = query.filter(Insertion.variant_class == variant_class)
+        values = [v.strip() for v in variant_class.split(",")]
+        if len(values) == 1:
+            query = query.filter(Insertion.variant_class == values[0])
+        else:
+            query = query.filter(Insertion.variant_class.in_(values))
     if annotation:
-        query = query.filter(Insertion.annotation == annotation)
+        values = [v.strip() for v in annotation.split(",")]
+        if len(values) == 1:
+            query = query.filter(Insertion.annotation == values[0])
+        else:
+            query = query.filter(Insertion.annotation.in_(values))
     if dataset_id:
         query = query.filter(Insertion.dataset_id == dataset_id)
 
@@ -255,5 +277,171 @@ def get_insertions_by_region(
 
     total = query.count()
     results = query.order_by(Insertion.start).offset(offset).limit(limit).all()
+
+    return PaginatedResponse(total=total, limit=limit, offset=offset, results=results)
+
+
+# ── File search helpers ───────────────────────────────────────────────────
+
+def _parse_regions_from_file(content: str) -> list[tuple[str, int, int]]:
+    """Parse a BED, CSV, or TSV file and return a list of (chrom, start, end) tuples.
+
+    SUPPORTED FORMATS:
+        BED  — tab-separated, no header expected, columns: chrom start end [...]
+               Coordinates are 0-based half-open [start, end).
+        CSV  — comma-separated with a header row. Looks for columns named
+               chrom/chr, start/chromStart, end/chromEnd (case-insensitive).
+        TSV  — same as CSV but tab-separated.
+
+    AUTO-DETECTION:
+        We sniff the first non-blank, non-comment line:
+          - If it looks like a standard BED row (first token starts with "chr"
+            and second/third tokens are integers), we treat it as BED.
+          - Otherwise we try CSV/TSV with header detection.
+
+    WHY RETURN A LIST?
+        We need to build an OR query in SQL: rows that overlap region A OR B OR C.
+        Returning a list lets the caller decide how to batch the query.
+
+    RAISES:
+        ValueError if no valid rows are found or the file format is unrecognisable.
+    """
+    lines = [ln.rstrip() for ln in content.splitlines() if ln.strip() and not ln.startswith("#")]
+    if not lines:
+        raise ValueError("File is empty or contains only comments.")
+
+    regions: list[tuple[str, int, int]] = []
+
+    # ── BED auto-detection ────────────────────────────────────────────
+    # BED files have chr... in column 0 and integers in columns 1 and 2.
+    first_tokens = lines[0].split("\t")
+    is_bed = (
+        len(first_tokens) >= 3
+        and first_tokens[0].startswith("chr")
+        and first_tokens[1].lstrip("-").isdigit()
+        and first_tokens[2].lstrip("-").isdigit()
+    )
+
+    if is_bed:
+        for line in lines:
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            try:
+                chrom, start, end = parts[0], int(parts[1]), int(parts[2])
+                regions.append((chrom, start, end))
+            except ValueError:
+                continue  # skip malformed rows silently
+        return regions
+
+    # ── CSV / TSV header-based detection ─────────────────────────────
+    # Sniff the delimiter (tab vs comma) from the first line.
+    dialect = "excel-tab" if "\t" in lines[0] else "excel"
+    reader = csv.DictReader(io.StringIO("\n".join(lines)), dialect=dialect)
+
+    # Normalise column names to lowercase for case-insensitive matching.
+    # Map common synonyms → canonical names.
+    CHROM_ALIASES = {"chrom", "chr", "chromosome", "chromname"}
+    START_ALIASES = {"start", "chromstart", "pos", "position"}
+    END_ALIASES   = {"end", "chromend", "stop"}
+
+    if reader.fieldnames is None:
+        raise ValueError("Could not detect column headers in file.")
+
+    lower_fields = {f.lower(): f for f in reader.fieldnames}
+
+    chrom_col = next((lower_fields[k] for k in lower_fields if k in CHROM_ALIASES), None)
+    start_col = next((lower_fields[k] for k in lower_fields if k in START_ALIASES), None)
+    end_col   = next((lower_fields[k] for k in lower_fields if k in END_ALIASES), None)
+
+    if not all([chrom_col, start_col, end_col]):
+        raise ValueError(
+            f"Could not find chrom/start/end columns. Found: {list(reader.fieldnames)}. "
+            "Expected columns named chrom/chr, start/chromStart, end/chromEnd."
+        )
+
+    for row in reader:
+        try:
+            chrom = row[chrom_col]
+            start = int(row[start_col])
+            end   = int(row[end_col])
+            regions.append((chrom, start, end))
+        except (ValueError, KeyError):
+            continue  # skip malformed rows silently
+
+    return regions
+
+
+@router.post("/insertions/file-search", response_model=PaginatedResponse)
+async def file_search_insertions(
+    file: UploadFile = File(...),
+    window: int = Query(default=0, ge=0, description="Extend each region by ±window bp"),
+    limit: int = Query(default=50, le=1000, ge=1),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+):
+    """Find insertions that overlap regions listed in an uploaded BED/CSV/TSV file.
+
+    WHAT THIS ENDPOINT DOES:
+        1. Reads the uploaded file (BED, CSV, or TSV)
+        2. Parses each row to get (chrom, start, end) coordinates
+        3. Optionally extends each region by ±window bp
+        4. Returns all insertions whose genomic coordinates overlap any of those regions
+
+    HOW OVERLAP IS DEFINED:
+        An insertion at [ins_start, ins_end] overlaps a query region [q_start, q_end] if:
+            ins_start <= q_end AND ins_end >= q_start
+        With window w, the query region becomes [q_start - w, q_end + w].
+
+    FILE FORMATS:
+        BED  — tab-separated, no header, columns: chrom start end [optional...]
+               BED start is 0-based; we keep coordinates as-is.
+        CSV  — comma-separated with header row containing chrom, start, end columns
+               (common synonyms like chr/chromosome/chromStart are also recognised).
+        TSV  — same as CSV but tab-separated.
+
+    RETURNS:
+        PaginatedResponse with the same structure as GET /v1/insertions.
+        Results are ordered by chrom, then start position.
+
+    EXAMPLE:
+        curl -X POST /v1/insertions/file-search \\
+             -F "file=@regions.bed" \\
+             -F "window=500"
+    """
+    # Read and decode the uploaded file.
+    # We decode as UTF-8 and silently replace any non-UTF-8 bytes to be
+    # tolerant of files saved with different encodings.
+    raw_bytes = await file.read()
+    content = raw_bytes.decode("utf-8", errors="replace")
+
+    # Parse regions from the file
+    try:
+        regions = _parse_regions_from_file(content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    if not regions:
+        raise HTTPException(status_code=400, detail="No valid chrom/start/end rows found in file.")
+
+    # Build an OR query: insertion overlaps any of the uploaded regions.
+    # Overlap condition: ins.start <= q_end AND ins.end >= q_start
+    # (this is the standard interval overlap check)
+    overlap_conditions = [
+        (Insertion.chrom == chrom)
+        & (Insertion.start <= end + window)
+        & (Insertion.end >= start - window)
+        for chrom, start, end in regions
+    ]
+
+    query = db.query(Insertion).filter(or_(*overlap_conditions))
+
+    total = query.count()
+    results = (
+        query.order_by(Insertion.chrom, Insertion.start)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     return PaginatedResponse(total=total, limit=limit, offset=offset, results=results)

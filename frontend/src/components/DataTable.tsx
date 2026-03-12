@@ -42,12 +42,13 @@
  *   isLoading   — Whether data is currently being fetched
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   useReactTable,
   getCoreRowModel,
   flexRender,
   type ColumnDef,
+  type RowSelectionState,
 } from "@tanstack/react-table";
 
 // ── Props interface ──────────────────────────────────────────────────────
@@ -76,6 +77,13 @@ export interface DataTableProps<TData> {
 
   /** Whether data is currently being fetched (shows a loading indicator). */
   isLoading?: boolean;
+
+  /**
+   * Called whenever the set of checked rows changes.
+   * Receives the array of original row objects that are currently selected.
+   * Omit this prop to hide checkboxes entirely.
+   */
+  onSelectionChange?: (selectedRows: TData[]) => void;
 }
 
 // ── Available page sizes ─────────────────────────────────────────────────
@@ -92,6 +100,7 @@ export default function DataTable<TData>({
   pageSize,
   onPaginationChange,
   isLoading = false,
+  onSelectionChange,
 }: DataTableProps<TData>) {
   // Calculate total number of pages
   const pageCount = Math.ceil(total / pageSize);
@@ -99,6 +108,27 @@ export default function DataTable<TData>({
   // "Go to page" input — tracks the raw text so the user can type freely.
   // We only jump when they press Enter or blur the field, and we clamp to [1, pageCount].
   const [goToInput, setGoToInput] = useState("");
+
+  // Row selection state: a map of row id → boolean.
+  // Only populated when the parent passes onSelectionChange.
+  // We reset selection whenever the page data changes so stale row IDs
+  // from a previous page don't linger.
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  useEffect(() => {
+    setRowSelection({});
+  }, [data]);
+
+  // Notify parent whenever selection changes.
+  useEffect(() => {
+    if (!onSelectionChange) return;
+    // getSelectedRowModel() returns the currently-selected rows based on
+    // the current rowSelection state and data.  We pull .original to get
+    // the raw TData objects (not the TanStack Row wrapper).
+    onSelectionChange(
+      table.getSelectedRowModel().rows.map((r) => r.original)
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rowSelection]);
 
   // Create TanStack Table instance
   // manualPagination = true tells TanStack "don't paginate locally,
@@ -109,8 +139,12 @@ export default function DataTable<TData>({
     pageCount,
     state: {
       pagination: { pageIndex, pageSize },
+      // Only pass rowSelection state when the parent wants selection.
+      ...(onSelectionChange ? { rowSelection } : {}),
     },
     manualPagination: true,
+    enableRowSelection: !!onSelectionChange,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -209,11 +243,30 @@ export default function DataTable<TData>({
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
+        {/*
+         * colSpan for the loading/empty states must account for the extra
+         * checkbox column when row selection is enabled.
+         */}
         <table className="w-full border-collapse border border-black text-sm">
           {/* Table header */}
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-black bg-white">
+                {/* Checkbox column header — only shown when selection is enabled */}
+                {onSelectionChange && (
+                  <th className="border border-black px-2 py-1 w-8">
+                    {/* Select-all checkbox */}
+                    <input
+                      type="checkbox"
+                      checked={table.getIsAllRowsSelected()}
+                      ref={(el) => {
+                        if (el) el.indeterminate = table.getIsSomeRowsSelected();
+                      }}
+                      onChange={table.getToggleAllRowsSelectedHandler()}
+                      aria-label="Select all rows"
+                    />
+                  </th>
+                )}
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
@@ -233,7 +286,7 @@ export default function DataTable<TData>({
             {isLoading ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={columns.length + (onSelectionChange ? 1 : 0)}
                   className="border border-black px-2 py-4 text-center"
                 >
                   Loading...
@@ -242,7 +295,7 @@ export default function DataTable<TData>({
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={columns.length + (onSelectionChange ? 1 : 0)}
                   className="border border-black px-2 py-4 text-center"
                 >
                   No results found.
@@ -250,7 +303,23 @@ export default function DataTable<TData>({
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-black hover:bg-gray-50">
+                <tr
+                  key={row.id}
+                  className={`border-b border-black hover:bg-gray-50 ${
+                    row.getIsSelected() ? "bg-gray-100" : ""
+                  }`}
+                >
+                  {/* Per-row checkbox — only shown when selection is enabled */}
+                  {onSelectionChange && (
+                    <td className="border border-black px-2 py-1 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.getIsSelected()}
+                        onChange={row.getToggleSelectedHandler()}
+                        aria-label={`Select row ${row.id}`}
+                      />
+                    </td>
+                  )}
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}

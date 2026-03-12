@@ -43,7 +43,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],     # read-only API — only GET is allowed
+    # GET for all read endpoints; POST for file-search (multipart upload).
+    # The API is still read-only — POST is only used to accept file input,
+    # not to create or modify any data in the database.
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 

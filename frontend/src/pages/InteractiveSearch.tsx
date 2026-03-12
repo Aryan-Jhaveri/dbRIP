@@ -56,6 +56,14 @@ import { useInsertions } from "../hooks/useInsertions";
 import { buildExportUrl } from "../api/client";
 import type { InsertionSummary } from "../types/insertion";
 
+// Column header labels in the same order as the columns array below.
+// Used to build the TSV header when copying selected rows.
+const COLUMN_HEADERS = [
+  "ID", "Chromosome", "Start", "End", "Category", "ME Type",
+  "RIP Type", "ME Subtype", "ME Length", "Strand", "TSD",
+  "Annotation", "Variant Class",
+];
+
 // ── Column definitions ──────────────────────────────────────────────────
 // Each column maps an accessorKey (field name from the API response)
 // to a header label shown in the table. Order matches the Shiny app.
@@ -74,6 +82,16 @@ const columns: ColumnDef<InsertionSummary, unknown>[] = [
   { accessorKey: "tsd", header: "TSD" },
   { accessorKey: "annotation", header: "Annotation" },
   { accessorKey: "variant_class", header: "Variant Class" },
+];
+
+// ── Fixed-value filter options ───────────────────────────────────────────
+// These match the exact values stored in the database.
+
+const ME_TYPES = ["ALU", "LINE1", "SVA", "HERVK", "PP"];
+const ME_CATEGORIES = ["Reference", "Non-reference"];
+const ANNOTATIONS = [
+  "PROMOTER", "5_UTR", "EXON", "INTRONIC", "3_UTR",
+  "TERMINATOR", "INTERGENIC",
 ];
 
 // ── Population options ───────────────────────────────────────────────────
@@ -146,6 +164,19 @@ export default function InteractiveSearch() {
   const [population, setPopulation] = useState("");
   const [minFreq, setMinFreq] = useState("");
 
+  // Fixed-value filters — each holds a comma-joined string sent to the API,
+  // or "" for no filter.  Multi-select is supported via the <select multiple>
+  // element; the selected options are joined with "," and the API applies an
+  // IN clause when it sees multiple values.
+  const [meTypes, setMeTypes] = useState<string[]>([]);
+  const [meCategories, setMeCategories] = useState<string[]>([]);
+  const [annotations, setAnnotations] = useState<string[]>([]);
+
+  // Currently selected rows (for the "Copy selected" button).
+  const [selectedRows, setSelectedRows] = useState<InsertionSummary[]>([]);
+  // Feedback state for copy button ("Copied!" flash).
+  const [copyFeedback, setCopyFeedback] = useState(false);
+
   // ── Debounce search ──────────────────────────────────────────────────
   // Wait 300ms after the user stops typing before sending the request.
   // This prevents hammering the API on every keystroke.
@@ -160,14 +191,18 @@ export default function InteractiveSearch() {
   }, [searchInput]);
 
   // ── Fetch data ───────────────────────────────────────────────────────
-  // All filtering is server-side. We pass search, population, and min_freq
-  // directly as API params. The API handles LIKE matching and JOIN filtering.
+  // All filtering is server-side. The API accepts comma-separated values for
+  // me_type, me_category, and annotation (IN clause) as well as free-text
+  // search and population-frequency filters.
   const { data, isLoading } = useInsertions({
     limit: pageSize,
     offset: pageIndex * pageSize,
     search: searchQuery || null,
     population: population || null,
     min_freq: minFreq ? parseFloat(minFreq) : null,
+    me_type: meTypes.length > 0 ? meTypes.join(",") : null,
+    me_category: meCategories.length > 0 ? meCategories.join(",") : null,
+    annotation: annotations.length > 0 ? annotations.join(",") : null,
   });
 
   // ── Pagination handler ───────────────────────────────────────────────
@@ -181,14 +216,33 @@ export default function InteractiveSearch() {
   );
 
   // ── Export URL ───────────────────────────────────────────────────────
-  // Build a download link for the current filters (CSV format).
-  // The export endpoint accepts the same query params as the list endpoint,
-  // so the downloaded CSV always matches what the table shows.
   const exportUrl = buildExportUrl("csv", {
     search: searchQuery || null,
     population: population || null,
     min_freq: minFreq ? parseFloat(minFreq) : null,
+    me_type: meTypes.length > 0 ? meTypes.join(",") : null,
+    me_category: meCategories.length > 0 ? meCategories.join(",") : null,
+    annotation: annotations.length > 0 ? annotations.join(",") : null,
   });
+
+  // ── Copy selected rows as TSV ─────────────────────────────────────────
+  // Formats the selected InsertionSummary rows as tab-separated text with a
+  // header row, then writes it to the clipboard. Shows "Copied!" for 1.5s.
+  const handleCopySelected = useCallback(() => {
+    const fields: (keyof InsertionSummary)[] = [
+      "id", "chrom", "start", "end", "me_category", "me_type",
+      "rip_type", "me_subtype", "me_length", "strand", "tsd",
+      "annotation", "variant_class",
+    ];
+    const header = COLUMN_HEADERS.join("\t");
+    const rows = selectedRows.map((row) =>
+      fields.map((f) => row[f] ?? "").join("\t")
+    );
+    navigator.clipboard.writeText([header, ...rows].join("\n")).then(() => {
+      setCopyFeedback(true);
+      setTimeout(() => setCopyFeedback(false), 1500);
+    });
+  }, [selectedRows]);
 
   return (
     <div>
@@ -256,6 +310,66 @@ export default function InteractiveSearch() {
         </select>
       </div>
 
+      {/* ── Fixed-value filters ─────────────────────────────────────────── */}
+      {/* Three <select multiple> dropdowns for ME Type, Category, and Annotation.
+          Hold Ctrl/Cmd to pick multiple values. Each sends a comma-joined value
+          to the API which applies a SQL IN clause. Changing any filter resets to
+          page 0 so the user doesn't land on a now-invalid page. */}
+      <div className="mb-4 flex flex-wrap items-start gap-4">
+        <label className="text-sm">
+          <span className="font-semibold block mb-1">ME Type:</span>
+          <select
+            multiple
+            value={meTypes}
+            onChange={(e) => {
+              setMeTypes(Array.from(e.target.selectedOptions, (o) => o.value));
+              setPageIndex(0);
+            }}
+            className="border border-black px-2 py-1 text-sm h-24"
+          >
+            {ME_TYPES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="font-semibold block mb-1">Category:</span>
+          <select
+            multiple
+            value={meCategories}
+            onChange={(e) => {
+              setMeCategories(Array.from(e.target.selectedOptions, (o) => o.value));
+              setPageIndex(0);
+            }}
+            className="border border-black px-2 py-1 text-sm h-24"
+          >
+            {ME_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="text-sm">
+          <span className="font-semibold block mb-1">Annotation:</span>
+          <select
+            multiple
+            value={annotations}
+            onChange={(e) => {
+              setAnnotations(Array.from(e.target.selectedOptions, (o) => o.value));
+              setPageIndex(0);
+            }}
+            className="border border-black px-2 py-1 text-sm h-24"
+          >
+            {ANNOTATIONS.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </label>
+
+        <p className="text-xs self-end pb-1">Hold Ctrl/Cmd to select multiple</p>
+      </div>
+
       {/* ── Error display ──────────────────────────────────────────────── */}
       {!isLoading && !data && (
         <p className="text-sm mb-4">
@@ -263,8 +377,8 @@ export default function InteractiveSearch() {
         </p>
       )}
 
-      {/* ── Download button ────────────────────────────────────────────── */}
-      <div className="mt-4">
+      {/* ── Download + copy buttons ─────────────────────────────────────── */}
+      <div className="mt-4 flex items-center gap-3">
         <a
           href={exportUrl}
           download
@@ -272,6 +386,15 @@ export default function InteractiveSearch() {
         >
           Download CSV
         </a>
+        {/* Copy selected rows as TSV — only shown when at least one row is checked */}
+        {selectedRows.length > 0 && (
+          <button
+            onClick={handleCopySelected}
+            className="border border-black px-3 py-1 text-sm cursor-pointer hover:bg-gray-100"
+          >
+            {copyFeedback ? "Copied!" : `Copy ${selectedRows.length} selected row${selectedRows.length === 1 ? "" : "s"}`}
+          </button>
+        )}
       </div>
 
       {/* ── Data table ─────────────────────────────────────────────────── */}
@@ -286,6 +409,7 @@ export default function InteractiveSearch() {
         pageSize={pageSize}
         onPaginationChange={handlePaginationChange}
         isLoading={isLoading}
+        onSelectionChange={setSelectedRows}
       />
 
 
