@@ -32,19 +32,22 @@ List insertions with optional filters and pagination.
 
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `me_type` | string | — | TE family: `ALU`, `LINE1`, `SVA`, `HERVK` |
-| `me_subtype` | string | — | TE subfamily, e.g. `AluYa5`, `AluYb8` |
-| `me_category` | string | — | `Reference` or `Non-reference` |
-| `variant_class` | string | — | `Common`, `Intermediate`, `Rare`, `Very Rare` |
-| `annotation` | string | — | Genomic context: `INTRONIC`, `INTERGENIC`, etc. |
-| `dataset_id` | string | — | Filter by dataset, e.g. `dbrip_v1` |
-| `population` | string | — | Population code: `EUR`, `AFR`, `EAS`, `SAS`, `AMR`, etc. |
+| `me_type` | string | — | TE family: `ALU`, `LINE1`, `SVA`, `HERVK`. Comma-separate for OR: `me_type=ALU,SVA` |
+| `me_subtype` | string | — | TE subfamily, e.g. `AluYa5`, `AluYb8` (exact match) |
+| `me_category` | string | — | `Reference` or `Non-reference`. Comma-separate for multiple. |
+| `variant_class` | string | — | `Common`, `Intermediate`, `Rare`, `Very Rare`. Comma-separate for multiple. |
+| `annotation` | string | — | Genomic context: `INTRONIC`, `INTERGENIC`, `EXON`, `PROMOTER`, `5_UTR`, `3_UTR`, `TERMINATOR`. Comma-separate for multiple. |
+| `dataset_id` | string | — | Filter by dataset source, e.g. `dbrip_v1` |
+| `population` | string | — | Population code: `EUR`, `AFR`, `EAS`, `SAS`, `AMR`, `ACB`, `ASW`, `BEB`, `CDX`, `CEU`, `CHB`, `CHS`, `CLM`, `ESN`, `FIN`, `GBR`, `GIH`, `GWD`, `IBS`, `ITU`, `JPT`, `KHV`, `LWK`, `MSL`, `MXL`, `PEL`, `PJL`, `PUR`, `STU`, `TSI`, `YRI`, `Non_African`, `All` |
 | `min_freq` | float | — | Minimum allele frequency (requires `population`) |
 | `max_freq` | float | — | Maximum allele frequency (requires `population`) |
+| `strand` | string | — | Strand: `+` or `-`. URL-encode `+` as `%2B`. Comma-separate for multiple: `strand=%2B,-`. Use `null` to match rows with no strand value. |
+| `chrom` | string | — | Chromosome, e.g. `chr1`. Comma-separate for multiple: `chrom=chr1,chrX` |
+| `search` | string | — | Free-text search across id, chrom, me_type, me_category, rip_type, me_subtype, annotation, variant_class (server-side LIKE, case-insensitive) |
 | `limit` | int | 50 | Page size (1–1000) |
 | `offset` | int | 0 | Pagination offset |
 
-All filters use AND logic — providing multiple filters narrows the results.
+All filter params use AND logic — providing multiple filters narrows the results. Comma-separated values within a single param use OR logic for that field.
 
 **Example:**
 

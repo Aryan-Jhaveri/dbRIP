@@ -57,15 +57,16 @@ dbrip search --me-type ALU --output json
 | Flag | Description |
 |------|-------------|
 | `--region`, `-r` | Genomic region (e.g. `chr1:1M-5M`) |
-| `--assembly`, `-a` | Genome assembly (default: `hg38`) |
-| `--me-type` | TE family: `ALU`, `LINE1`, `SVA`, `HERVK` |
+| `--assembly`, `-a` | Genome assembly used with `--region` (default: `hg38`) |
+| `--me-type` | TE family: `ALU`, `LINE1`, `SVA`, `HERVK`. Comma-separate for multiple: `ALU,SVA` |
 | `--me-subtype` | TE subfamily (e.g. `AluYa5`) |
 | `--me-category` | `Reference` or `Non-reference` |
 | `--variant-class` | `Common`, `Intermediate`, `Rare`, `Very Rare` |
-| `--annotation` | Genomic context (e.g. `INTRONIC`) |
-| `--population`, `-p` | Population code (e.g. `EUR`, `AFR`) |
-| `--min-freq` | Minimum allele frequency |
-| `--max-freq` | Maximum allele frequency |
+| `--annotation` | Genomic context: `INTRONIC`, `EXON`, `PROMOTER`, `5_UTR`, `3_UTR`, `INTERGENIC`, `TERMINATOR` |
+| `--dataset-id` | Filter by dataset source, e.g. `dbrip_v1` |
+| `--population`, `-p` | Population code (e.g. `EUR`, `AFR`, `EAS`, `SAS`, `AMR`) |
+| `--min-freq` | Minimum allele frequency (requires `--population`) |
+| `--max-freq` | Maximum allele frequency (requires `--population`) |
 | `--limit`, `-l` | Number of results (default: 50, max: 1000) |
 | `--offset` | Pagination offset |
 | `--output`, `-o` | `table` (default) or `json` |
@@ -106,9 +107,10 @@ dbrip export --format csv -o all_insertions.csv
 
 | Flag | Description |
 |------|-------------|
-| `--format`, `-f` | `bed` (default), `vcf`, or `csv` |
+| `--format`, `-f` | `bed` (default), `vcf`, or `csv`. BED is 0-based; VCF and CSV are 1-based. |
 | `--out`, `-o` | Output file path (defaults to stdout) |
-| *(all filter flags)* | Same as `dbrip search` |
+| `--dataset-id` | Filter by dataset source, e.g. `dbrip_v1` |
+| *(all other filter flags)* | Same as `dbrip search`: `--me-type`, `--me-category`, `--variant-class`, `--annotation`, `--population`, `--min-freq`, `--max-freq` |
 
 ---
 
