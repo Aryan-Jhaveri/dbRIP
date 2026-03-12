@@ -1,45 +1,63 @@
 # Next Steps — What to Build on Top of the API
 
-The core API is working: ingest pipeline, database, 7 endpoints, 60 tests (13+ ingest + 26+ API + 21+ CLI). 
+The core API is working: ingest pipeline, database, 7 endpoints, 60 tests (13 ingest + 26 API + 21 CLI).
 Below are the next things to build, roughly in priority order.
 
 
-## To-Do
+## Pending
 
-- [ ] Front end has no filters for the pop_freq table, for RIP filtered by pop samples. Need to add filters for that in Interactive Search, and Batch Search.
+- [ ] **Pop-freq filters** — Interactive Search and Batch Search have no filters for the
+  `pop_freq` table (filter insertions by population sample frequency). Need dropdowns in
+  both tabs for selecting a population and a minimum frequency threshold.
 
-- ~~Fix interactive search and filtering not working~~ — DONE. Search is fully server-side (LIKE across 8 columns with debounce). Fixed-value filters (ME Type, Category, Annotation) use `<select multiple>` → SQL `IN` clause. Population + min_freq filters wire directly to API. No empty-page bug.
+- [ ] **Column header sort + filter dropdowns** — column headers in the data table should
+  support click-to-sort and inline filter dropdowns (e.g., filter ME Type to just `ALU`
+  directly from the column header).
 
-- ~~The row count description~~ — DONE. "Showing X to Y of Z entries" is dynamically computed from API `total`.
+- [ ] **Export enums** — add `FastAPI Enum` / `Literal` types to the export endpoint so
+  `?format=` is restricted to `bed | vcf | csv` at the API level, not just in docs.
 
-- ~~Add row selection~~ — DONE. Row-click highlights blue (`bg-blue-200`); shift+click for range; drag-to-select (hold and sweep) with auto select/deselect mode. Selected rows feed the "Copy N selected rows" button which fetches full detail (inc. pop freqs) and writes TSV to clipboard.
+- [ ] **Strand enums** — consider:
+  ```python
+  class Strand(str, Enum):
+      plus = "+"
+      minus = "-"
 
-- [ ] Allow filter buttons on column headers → Column header filter dropdowns (e.g., filter by ALU, SVA) + sort
+  raw_strand = Strand.plus.value  # Returns "+"
+  ```
+  May be necessary if strand values in the CSV are inconsistent across rows.
 
-- ~~Add the ability to jump to specific pages~~ — DONE. "Go to:" input on the pagination bar.
+- [ ] **Error handling docs** — document default fallback behavior for query parameters.
+  If a caller omits `?` or provides no parameters, what does each endpoint return?
+  Add clear docstrings and OpenAPI descriptions for each parameter's default.
 
-- ~~Add mkdocs (docs/*md's) to the frontend~~ — DONE. Docs tab in the frontend renders the four MkDocs pages (index, api-reference, cli, biology).
 
-- ~~File search page is empty~~ — DONE. FileSearch.tsx has file upload (BED/CSV/TSV), window input, and results table.
+## Done
 
-- ~~Population frequency popup~~ — REPLACED. Popup removed. Pop freqs are now shown inline as a nested row below each data row when the user checks the row's checkbox. Header checkbox expands/collapses all rows on the page. TanStack Query caches fetched detail by ID.
+- ✅ **Interactive search and filtering** — server-side `LIKE` across 8 columns with debounce.
+  Fixed-value filters (ME Type, Category, Annotation) use `<select multiple>` → SQL `IN` clause.
+  Population + min_freq filters wire directly to the API. No empty-page bug.
 
-- [ ] Add Predefined values to exports (`FastAPI Enum` / `Literal`) so vcf, bed calls are restricted to certain output types. Also look into predefined values for other dropdowns in the API.
+- ✅ **Row count description** — "Showing X to Y of Z entries" is dynamically computed from
+  API `total`.
 
-- [ ] Look into enums for plus/minus strand:
+- ✅ **Row selection** — row-click highlights blue (`bg-blue-200`); shift+click for range;
+  drag-to-select (hold and sweep) with auto select/deselect mode. Selected rows feed the
+  "Copy N selected rows" button which fetches full detail (including pop freqs) and writes
+  TSV to clipboard.
 
-        class Strand(str, Enum):
-            plus = "+"
-            minus = "-"
+- ✅ **Jump to page** — "Go to:" input on the pagination bar.
 
-        raw_strand = Strand.plus.value  # Returns "+"
+- ✅ **MkDocs tab** — the frontend's Docs tab renders all four MkDocs pages
+  (index, api-reference, cli, biology) fetched from the API.
 
-    if necessary
+- ✅ **File Search** — BED/CSV/TSV file upload, configurable window size, overlap query,
+  and results table with download.
 
-- [ ] For error handling in query parameters, need fallbacks or docs for:
+- ✅ **Pop freq inline expand** — population frequencies shown as a nested row below each
+  data row when the user checks that row's checkbox. Header checkbox expands/collapses all
+  rows on the current page. TanStack Query caches fetched detail by ID.
 
-  Question: if the user doesn't enter `?` or doesn't enter relevant parameters after `?`, how do different calls handle this gracefully? Do the calls tell what the default fallbacks are?
-           
 ---
 
 ## 1. MCP Server — Let Claude Query the Database
@@ -101,7 +119,7 @@ def get_stats(by: str = "me_type") -> dict:
 
 ---
 
-## 2. CLI Tool — `dbrip` Command — DONE
+## 2. CLI Tool — DONE
 
 **Status:** Complete. 5 commands (`search`, `get`, `export`, `stats`, `datasets`), 21 tests.
 
@@ -156,14 +174,16 @@ dbrip export --format bed | bedtools intersect -a - -b peaks.bed
 - Interactive Search: server-side search + 6 filter types + pagination + "Go to page" + Download CSV + Copy selected rows (TSV with pop freqs) + drag-to-select rows + inline pop freq expand via checkbox
 - File Search: BED/CSV/TSV upload + window overlap + results table + download
 - Batch Search: checkbox filters (ME type, category, annotation, strand, chrom) + download
-- Docs tab: renders the four MkDocs pages (index, api-reference, cli, biology)
+- API Reference tab: renders MkDocs `api-reference.md` fetched from the API
+- CLI Reference tab: quick-reference for all `dbrip` commands
 - `DataTable` component: generic, reusable, two independent interaction systems (row-click = copy selection; checkbox = inline expand)
 
 **Stack:** `frontend/` — `npm run dev` for local, `npx tsc --noEmit` to type-check.
 
 **Remaining frontend work:**
 - Column header sort + filter dropdowns
-- IGV.js genome browser (stretch goal)
+- Pop-freq filters in Interactive Search and Batch Search
+- IGV.js genome browser (see § 6 below)
 - Docker + FastAPI `StaticFiles` mount for single-process deployment
 
 ---
@@ -197,7 +217,98 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-## 6. Additional Datasets
+## 6. Genome Browser (igv.js)
+
+**What:** Embed an interactive genome browser in a new "Genome Browser" tab so researchers
+can visualize TE insertion positions directly in the web app, alongside tracks like RefSeq genes.
+
+**Why:** Seeing an insertion in genomic context — surrounding genes, GC content, repeats — helps
+researchers quickly assess biological significance without switching to a separate tool like UCSC
+or IGV Desktop.
+
+**Where:** New tab in `frontend/src/App.tsx` + new component `frontend/src/pages/GenomeBrowser.tsx`
+
+**Install:**
+```bash
+cd frontend
+npm install igv
+```
+
+**React integration pattern:**
+```tsx
+// GenomeBrowser.tsx
+import { useRef, useEffect } from "react";
+import igv from "igv";
+
+export function GenomeBrowser({ locus }: { locus: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    igv.createBrowser(containerRef.current, {
+      genome: "hg38",
+      locus,               // e.g. "chr1:1,000,000-2,000,000"
+      tracks: [
+        {
+          type: "annotation",
+          name: "dbRIP Insertions",
+          // Fetch insertions for the visible region from the API
+          url: `/v1/insertions/region/hg38/${locus}?format=bed`,
+          format: "bed",
+        },
+      ],
+    });
+  }, [locus]);
+
+  return <div ref={containerRef} style={{ height: 500 }} />;
+}
+```
+
+**Locus format:** `chr1:1,000,000-2,000,000` (commas optional; igv.js also accepts
+`chr1:1000000-2000000`).
+
+**Track data:** Use the existing `GET /v1/insertions/region/hg38/{chrom}:{start}-{end}` endpoint.
+The response can be formatted as BED via `?format=bed` (already supported by the export router).
+
+**Placement:** Add a 6th tab "Genome Browser" in `App.tsx` alongside the existing five tabs.
+
+**Effort:** Small — one `npm install igv`, one new component `GenomeBrowser.tsx`, one new tab entry.
+
+---
+
+## 7. Manifest-Driven Frontend
+
+**Goal:** If the CSV gains new columns (new annotation types, CHM13 coordinates, multi-assembly
+support), only the YAML manifest should need to change — the frontend adapts automatically.
+
+**Why this matters:** Right now, the frontend's table columns, filter dropdowns, and export fields
+are hardcoded in TypeScript. Every time the lab adds a new dataset with different columns, a
+developer has to update both the API models and the frontend components separately. This creates
+frontend drift — the UI silently shows fewer columns than the API provides.
+
+**How it would work:**
+1. Add a `GET /v1/schema` endpoint that reads the loaded manifest and returns column names and types:
+   ```json
+   {
+     "columns": [
+       { "name": "id",      "type": "string",  "filterable": false },
+       { "name": "chrom",   "type": "string",  "filterable": true  },
+       { "name": "me_type", "type": "enum",    "values": ["ALU", "LINE1", "SVA"] },
+       { "name": "start",   "type": "integer", "filterable": false }
+     ]
+   }
+   ```
+2. The frontend calls `GET /v1/schema` at startup via TanStack Query and builds its table columns,
+   filter dropdowns, and export fields from that response instead of hardcoded TypeScript arrays.
+3. When a new dataset with new columns is loaded, the frontend automatically shows the new columns
+   and offers the new filter values — no TypeScript changes required.
+
+**When to build:** After the first time a second dataset is loaded (e.g., euL1db). Until then,
+the current hardcoded approach is simpler and less error-prone.
+
+---
+
+## 8. Additional Datasets
 
 **What:** Load other TE databases alongside dbRIP.
 
@@ -217,7 +328,7 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 ---
 
-## 7. Enrichment / Annotation Extensions
+## 9. Enrichment / Annotation Extensions
 
 **What:** Add biological context to insertions — gene names, OMIM disease links.
 
@@ -245,7 +356,7 @@ CREATE TABLE enrichment (
 
 ---
 
-## 8. Liftover (hg19 / CHM13 coordinates)
+## 10. Liftover (hg19 / CHM13 coordinates)
 
 **What:** Provide alternate coordinates for each insertion in hg19 and CHM13 assemblies.
 
@@ -267,7 +378,8 @@ CREATE TABLE coordinates_liftover (
 2. Run `liftOver` to convert hg38 → hg19 and hg38 → CHM13
 3. Load the results into the `coordinates_liftover` table
 
-**New endpoint:** Region queries would accept `assembly=hg19` and automatically use the lifted coordinates.
+**New endpoint:** Region queries would accept `assembly=hg19` and automatically use the
+lifted coordinates.
 
 **Effort:** Medium — the tool exists, the challenge is handling unmapped regions.
 
@@ -275,13 +387,15 @@ CREATE TABLE coordinates_liftover (
 
 ## Suggested Priority
 
-| Priority | What | Why |
-|----------|------|-----|
-| 1 | Docker (SQLite-only) | Makes it deployable immediately |
-| 2 | MCP Server | High-value, low-effort — Claude can query real data |
-| ~~3~~ | ~~CLI tool~~ | Done — 5 commands, 21 tests |
-| 4 | Additional datasets | Multiplies the value of everything above |
-| 5 | Web frontend | Useful but big effort — FastAPI `/docs` works for now |
-| 6 | Enrichment | High scientific value but requires external data work |
-| 7 | Liftover | Important for cross-assembly analysis |
-| 8 | PostgreSQL + Alembic | Only needed when scale demands it |
+| Priority | What | Status | Why |
+|----------|------|--------|-----|
+| 1 | Docker (SQLite-only) | Pending | Makes it deployable immediately |
+| 2 | MCP Server | Pending | High-value, low-effort — Claude can query real data |
+| 3 | CLI tool | Done — 5 commands, 21 tests | — |
+| 4 | Web frontend | Done — core features shipped | — |
+| 5 | Genome Browser (igv.js) | Pending (stretch) | Low-effort; useful for interactive exploration |
+| 6 | Manifest-Driven Frontend | Pending (after 2nd dataset) | Future-proofs UI against schema changes |
+| 7 | Additional datasets | Pending | Multiplies the value of everything above |
+| 8 | Enrichment | Pending | High scientific value but requires external data work |
+| 9 | Liftover | Pending | Important for cross-assembly analysis |
+| 10 | PostgreSQL + Alembic | Pending | Only needed when scale demands it |
