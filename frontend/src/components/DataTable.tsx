@@ -42,7 +42,7 @@
  *   isLoading   — Whether data is currently being fetched
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -117,6 +117,10 @@ export default function DataTable<TData>({
   useEffect(() => {
     setRowSelection({});
   }, [data]);
+
+  // Tracks which row was last clicked (for shift-click range selection).
+  // A ref (not state) because updating it shouldn't trigger a re-render.
+  const lastClickedIndexRef = useRef<number | null>(null);
 
   // Notify parent whenever selection changes.
   useEffect(() => {
@@ -309,14 +313,43 @@ export default function DataTable<TData>({
                     row.getIsSelected() ? "bg-gray-100" : ""
                   }`}
                 >
-                  {/* Per-row checkbox — only shown when selection is enabled */}
+                  {/* Per-row checkbox — only shown when selection is enabled.
+                      Supports shift-click to select a contiguous range of rows.
+                      Normal click toggles the individual row; shift-click selects
+                      every row between the last-clicked row and this one. */}
                   {onSelectionChange && (
                     <td className="border border-black px-2 py-1 w-8 text-center">
                       <input
                         type="checkbox"
                         checked={row.getIsSelected()}
-                        onChange={row.getToggleSelectedHandler()}
+                        // We handle all selection logic in onClick, so onChange is a no-op.
+                        // This is required because React treats <input checked> as a
+                        // controlled element — without onChange it warns about read-only.
+                        onChange={() => {}}
+                        onClick={(e) => {
+                          if (e.shiftKey && lastClickedIndexRef.current !== null) {
+                            // Shift+click: select all rows from lastClickedIndex to this row.
+                            // Math.min/max handles clicking above or below the anchor row.
+                            const lo = Math.min(lastClickedIndexRef.current, row.index);
+                            const hi = Math.max(lastClickedIndexRef.current, row.index);
+                            setRowSelection((prev) => {
+                              const next = { ...prev };
+                              table.getRowModel().rows.forEach((r) => {
+                                if (r.index >= lo && r.index <= hi) {
+                                  next[r.id] = true;
+                                }
+                              });
+                              return next;
+                            });
+                          } else {
+                            // Normal click: toggle just this row.
+                            row.getToggleSelectedHandler()(e);
+                          }
+                          // Always update the anchor for the next potential shift-click.
+                          lastClickedIndexRef.current = row.index;
+                        }}
                         aria-label={`Select row ${row.id}`}
+                        title="Click to select. Shift+click to select a range."
                       />
                     </td>
                   )}

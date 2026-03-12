@@ -28,7 +28,7 @@ import io
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
 from app.models import Insertion, PopFrequency
@@ -36,12 +36,30 @@ from app.routers.insertions import _apply_filters
 
 router = APIRouter(prefix="/v1", tags=["export"])
 
+# ── Canonical population order ───────────────────────────────────────────
+# Matches the manifest's population_columns section.
+# Individual populations (26) come first, then the 7 super-populations.
+# This order is used as column headers in the CSV export and copy-to-clipboard.
+_POP_ORDER = [
+    # Individual populations (26 sub-populations from 1000 Genomes Project)
+    "ACB", "ASW", "BEB", "CDX", "CEU", "CHB", "CHS", "CLM", "ESN", "FIN",
+    "GBR", "GIH", "GWD", "IBS", "ITU", "JPT", "KHV", "LWK", "MSL", "MXL",
+    "PEL", "PJL", "PUR", "STU", "TSI", "YRI",
+    # Super-populations (5 continental + 2 summary groups)
+    "AFR", "AMR", "EAS", "EUR", "SAS", "Non_African", "All",
+]
+
 
 def _get_filtered_insertions(db, me_type, me_subtype, me_category, variant_class,
                               annotation, dataset_id, population, min_freq, max_freq,
                               strand=None, chrom=None):
-    """Build and execute a filtered query, returning all matching insertions."""
-    query = db.query(Insertion)
+    """Build and execute a filtered query, returning all matching insertions.
+
+    Uses joinedload so population frequencies are fetched in the same SQL query
+    instead of one extra query per insertion (N+1 problem). This is important
+    for the CSV export which needs pop data for every row.
+    """
+    query = db.query(Insertion).options(joinedload(Insertion.pop_frequencies))
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
                            annotation, dataset_id, population, min_freq, max_freq, db,
                            strand=strand, chrom=chrom)
@@ -96,18 +114,40 @@ def _to_vcf(insertions) -> str:
 
 
 def _to_csv(insertions) -> str:
-    """Convert insertions to flat CSV."""
-    header = "id,dataset_id,assembly,chrom,start,end,strand,me_category,me_type,rip_type,me_subtype,me_length,tsd,annotation,variant_class"
+    """Convert insertions to flat CSV, including one column per population.
+
+    The population columns come after the 15 core fields and follow _POP_ORDER
+    (individual populations first, then super-populations). Missing AF values
+    are written as empty strings so spreadsheet tools don't misinterpret them.
+
+    WHY INCLUDE POPULATION COLUMNS?
+        Researchers need to export allele frequencies alongside the insertion
+        metadata so they can filter or plot in R/Python without a second query.
+    """
+    header = (
+        "id,dataset_id,assembly,chrom,start,end,strand,me_category,me_type,"
+        "rip_type,me_subtype,me_length,tsd,annotation,variant_class,"
+        + ",".join(_POP_ORDER)
+    )
     lines = [header]
     for ins in insertions:
-        row = [
+        # Build a dict of population → AF for fast lookup while writing columns.
+        # pop_frequencies is already loaded via joinedload in _get_filtered_insertions.
+        pop_af = {pf.population: pf.af for pf in ins.pop_frequencies}
+
+        core = [
             ins.id, ins.dataset_id or "", ins.assembly, ins.chrom,
             str(ins.start), str(ins.end), ins.strand or "",
             ins.me_category or "", ins.me_type, ins.rip_type or "",
             ins.me_subtype or "", str(ins.me_length) if ins.me_length else "",
             ins.tsd or "", ins.annotation or "", ins.variant_class or "",
         ]
-        lines.append(",".join(row))
+        # Output AF for each population in canonical order; empty string if absent or null.
+        pop_vals = [
+            str(pop_af[p]) if pop_af.get(p) is not None else ""
+            for p in _POP_ORDER
+        ]
+        lines.append(",".join(core + pop_vals))
     return "\n".join(lines) + "\n"
 
 

@@ -49,19 +49,28 @@
  *   API endpoint that includes them.
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import DataTable from "../components/DataTable";
 import { useInsertions, useInsertion } from "../hooks/useInsertions";
-import { buildExportUrl } from "../api/client";
+import { buildExportUrl, getInsertion } from "../api/client";
 import type { InsertionSummary } from "../types/insertion";
 
-// Column header labels in the same order as the columns array below.
-// Used to build the TSV header when copying selected rows.
+// Column header labels for the 13 summary fields.
+// Used as the first part of the TSV header when copying selected rows.
 const COLUMN_HEADERS = [
   "ID", "Chromosome", "Start", "End", "Category", "ME Type",
   "RIP Type", "ME Subtype", "ME Length", "Strand", "TSD",
   "Annotation", "Variant Class",
+];
+
+// Canonical population order — mirrors the manifest and export.py _POP_ORDER.
+// When copying, these become the last 33 columns after the 13 summary columns.
+const POP_ORDER = [
+  "ACB","ASW","BEB","CDX","CEU","CHB","CHS","CLM","ESN","FIN",
+  "GBR","GIH","GWD","IBS","ITU","JPT","KHV","LWK","MSL","MXL",
+  "PEL","PJL","PUR","STU","TSI","YRI",
+  "AFR","AMR","EAS","EUR","SAS","Non_African","All",
 ];
 
 // ── Fixed-value filter options ───────────────────────────────────────────
@@ -154,12 +163,20 @@ export default function InteractiveSearch() {
 
   // Currently selected rows (for the "Copy selected" button).
   const [selectedRows, setSelectedRows] = useState<InsertionSummary[]>([]);
-  // Feedback state for copy button ("Copied!" flash).
-  const [copyFeedback, setCopyFeedback] = useState(false);
 
-  // Which insertion ID (if any) has its population panel expanded below the table.
-  // Clicking the same ID again collapses the panel (toggle behaviour).
+  // Copy button state machine: idle → loading (fetching pop data) → done (flash "Copied!") → idle
+  const [copyState, setCopyState] = useState<"idle" | "loading" | "done">("idle");
+
+  // Which insertion ID (if any) has its population popup open.
+  // Clicking the same ID again closes the popup (toggle behaviour).
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Viewport-relative position where the popup should appear (anchored to the clicked ID button).
+  // null when no popup is open.
+  const [popupAnchor, setPopupAnchor] = useState<{ top: number; left: number } | null>(null);
+
+  // Ref on the popup div for click-outside detection.
+  const popupRef = useRef<HTMLDivElement>(null);
 
   // ── Column definitions ────────────────────────────────────────────────
   // Defined inside the component (with useMemo) so the ID cell renderer can
@@ -172,13 +189,28 @@ export default function InteractiveSearch() {
       {
         accessorKey: "id",
         header: "ID",
-        // Custom cell renderer: make the ID a clickable button that toggles
-        // the population frequency panel. Bold text = currently expanded.
+        // Custom cell renderer: make the ID a clickable button that opens a
+        // floating popup showing population frequencies. Bold = currently open.
+        // stopPropagation prevents the document click-outside handler from
+        // immediately closing the popup that this click just opened.
         cell: ({ getValue }) => {
           const id = getValue() as string;
           return (
             <button
-              onClick={() => setSelectedId(id === selectedId ? null : id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (id === selectedId) {
+                  setSelectedId(null);
+                  setPopupAnchor(null);
+                } else {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  // Clamp left so the popup doesn't overflow the right edge of the viewport.
+                  const POPUP_WIDTH = 640;
+                  const left = Math.min(rect.left, window.innerWidth - POPUP_WIDTH - 16);
+                  setPopupAnchor({ top: rect.bottom + 6, left });
+                  setSelectedId(id);
+                }
+              }}
               className={`underline cursor-pointer text-left ${id === selectedId ? "font-bold" : ""}`}
               title="Click to view population frequencies"
             >
@@ -215,6 +247,33 @@ export default function InteractiveSearch() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // ── Close popup on Escape or click-outside ───────────────────────────
+  useEffect(() => {
+    if (!selectedId) return;
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedId(null);
+        setPopupAnchor(null);
+      }
+    };
+    // Click-outside: close if the click lands outside the popup div.
+    // The ID button uses stopPropagation() so it never reaches this listener.
+    const handleClickOutside = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setSelectedId(null);
+        setPopupAnchor(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKey);
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [selectedId]);
 
   // ── Fetch population detail ───────────────────────────────────────────
   // When the user clicks an ID, fetch the full InsertionDetail (which includes
@@ -256,23 +315,48 @@ export default function InteractiveSearch() {
     annotation: annotations.length > 0 ? annotations.join(",") : null,
   });
 
-  // ── Copy selected rows as TSV ─────────────────────────────────────────
-  // Formats the selected InsertionSummary rows as tab-separated text with a
-  // header row, then writes it to the clipboard. Shows "Copied!" for 1.5s.
-  const handleCopySelected = useCallback(() => {
-    const fields: (keyof InsertionSummary)[] = [
-      "id", "chrom", "start", "end", "me_category", "me_type",
-      "rip_type", "me_subtype", "me_length", "strand", "tsd",
-      "annotation", "variant_class",
-    ];
-    const header = COLUMN_HEADERS.join("\t");
-    const rows = selectedRows.map((row) =>
-      fields.map((f) => row[f] ?? "").join("\t")
-    );
-    navigator.clipboard.writeText([header, ...rows].join("\n")).then(() => {
-      setCopyFeedback(true);
-      setTimeout(() => setCopyFeedback(false), 1500);
-    });
+  // ── Copy selected rows as TSV (with population frequencies) ──────────
+  // Fetches full InsertionDetail for each selected row in parallel, then
+  // writes a TSV to the clipboard with 13 summary columns + 33 pop columns.
+  //
+  // WHY ASYNC?
+  //   The summary rows shown in the table don't include population frequencies
+  //   (too expensive to load for all 50 rows per page). When copying, we fetch
+  //   the detail for each selected ID in parallel. TanStack Query caches these,
+  //   so if the user already clicked an ID to view its popup, that detail is
+  //   already cached and the copy is instant for that row.
+  const handleCopySelected = useCallback(async () => {
+    setCopyState("loading");
+    try {
+      // Fetch InsertionDetail for each selected row in parallel.
+      const details = await Promise.all(selectedRows.map((r) => getInsertion(r.id)));
+
+      const summaryFields: (keyof InsertionSummary)[] = [
+        "id", "chrom", "start", "end", "me_category", "me_type",
+        "rip_type", "me_subtype", "me_length", "strand", "tsd",
+        "annotation", "variant_class",
+      ];
+
+      const header = [...COLUMN_HEADERS, ...POP_ORDER].join("\t");
+      const rows = details.map((detail) => {
+        // Build a fast lookup: population code → AF value
+        const popAf: Record<string, number | null> = {};
+        detail.populations.forEach((pf) => { popAf[pf.population] = pf.af; });
+
+        const summaryVals = summaryFields.map((f) => detail[f] ?? "");
+        const popVals = POP_ORDER.map((pop) =>
+          popAf[pop] != null ? (popAf[pop] as number).toFixed(4) : ""
+        );
+        return [...summaryVals, ...popVals].join("\t");
+      });
+
+      await navigator.clipboard.writeText([header, ...rows].join("\n"));
+      setCopyState("done");
+      setTimeout(() => setCopyState("idle"), 1500);
+    } catch {
+      // If fetch or clipboard fails, silently reset so the button is usable again.
+      setCopyState("idle");
+    }
   }, [selectedRows]);
 
   return (
@@ -417,13 +501,18 @@ export default function InteractiveSearch() {
         >
           Download CSV
         </a>
-        {/* Copy selected rows as TSV — only shown when at least one row is checked */}
+        {/* Copy selected rows as TSV (summary + pop columns) — shown when ≥1 row checked */}
         {selectedRows.length > 0 && (
           <button
             onClick={handleCopySelected}
-            className="border border-black px-3 py-1 text-sm cursor-pointer hover:bg-gray-100"
+            disabled={copyState === "loading"}
+            className="border border-black px-3 py-1 text-sm cursor-pointer hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {copyFeedback ? "Copied!" : `Copy ${selectedRows.length} selected row${selectedRows.length === 1 ? "" : "s"}`}
+            {copyState === "loading"
+              ? "Copying..."
+              : copyState === "done"
+              ? "Copied!"
+              : `Copy ${selectedRows.length} selected row${selectedRows.length === 1 ? "" : "s"}`}
           </button>
         )}
       </div>
@@ -443,59 +532,65 @@ export default function InteractiveSearch() {
         onSelectionChange={setSelectedRows}
       />
 
-      {/* ── Population frequencies panel ────────────────────────────────── */}
-      {/* Appears below the table when the user clicks an ID.
-          Shows the 33 individual + 7 super-population allele frequencies for
-          that insertion, sourced from GET /v1/insertions/{id}.
-          Click the same ID again (or "Close") to collapse the panel. */}
-      {selectedId && (
-        <div className="mt-6 border border-black p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-sm">
+      {/* ── Population frequencies popup ─────────────────────────────────── */}
+      {/* Floating card anchored to the clicked ID cell via position:fixed.
+          Uses viewport-relative coordinates from getBoundingClientRect() so it
+          stays correctly positioned even when the table is scrolled.
+          Closes on: Close button, Escape key, or clicking outside the card. */}
+      {selectedId && popupAnchor && (
+        <div
+          ref={popupRef}
+          style={{ position: "fixed", top: popupAnchor.top, left: popupAnchor.left, zIndex: 50, width: 640 }}
+          className="bg-white border border-black shadow-lg p-3"
+        >
+          {/* Header row: ID label + Close button */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-semibold text-sm">
               Population Frequencies — {selectedId}
-            </h2>
+            </span>
             <button
-              onClick={() => setSelectedId(null)}
-              className="text-sm border border-black px-2 py-0.5 cursor-pointer hover:bg-gray-100"
+              onClick={() => { setSelectedId(null); setPopupAnchor(null); }}
+              className="text-sm border border-black px-2 py-0.5 cursor-pointer hover:bg-gray-100 ml-4 flex-shrink-0"
             >
               Close
             </button>
           </div>
 
+          {/* Content: loading spinner, or horizontal table */}
           {detailLoading ? (
             <p className="text-sm">Loading...</p>
           ) : detailData ? (
+            /*
+             * Horizontal layout: population codes as <th> in the header row,
+             * AF values as <td> in the data row. With 33 columns this is wider
+             * than the card, so overflow-x: auto lets the user scroll sideways.
+             * Each cell is intentionally compact (px-2 py-0.5) to fit more columns.
+             */
             <div className="overflow-x-auto">
-              {/*
-               * Two-column table: Population code | Allele Frequency.
-               * The API returns populations in the order they appear in the DB
-               * (individual pops first, then super-pops — matching the manifest).
-               * AF values are in [0, 1]; null means no data for that population.
-               */}
-              <table className="border-collapse border border-black text-sm">
+              <table className="border-collapse border border-black text-xs whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-black bg-white">
-                    <th className="border border-black px-3 py-1 text-left font-semibold">
-                      Population
-                    </th>
-                    <th className="border border-black px-3 py-1 text-left font-semibold">
-                      Allele Frequency
-                    </th>
+                  <tr className="bg-white border-b border-black">
+                    {detailData.populations.map((pf) => (
+                      <th
+                        key={pf.population}
+                        className="border border-black px-2 py-0.5 font-semibold text-center"
+                      >
+                        {pf.population}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {detailData.populations.map((pf) => (
-                    <tr
-                      key={pf.population}
-                      className="border-b border-black hover:bg-gray-50"
-                    >
-                      <td className="border border-black px-3 py-1">{pf.population}</td>
-                      <td className="border border-black px-3 py-1">
-                        {/* Show 4 decimal places for precision; "—" when null */}
+                  <tr>
+                    {detailData.populations.map((pf) => (
+                      <td
+                        key={pf.population}
+                        className="border border-black px-2 py-0.5 text-center"
+                      >
                         {pf.af !== null ? pf.af.toFixed(4) : "—"}
                       </td>
-                    </tr>
-                  ))}
+                    ))}
+                  </tr>
                 </tbody>
               </table>
             </div>
