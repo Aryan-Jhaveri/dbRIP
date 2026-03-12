@@ -121,6 +121,9 @@ const POPULATIONS = [
   { value: "STU", label: "STU — Sri Lankan Tamil in the UK" },
   { value: "TSI", label: "TSI — Toscani in Italy" },
   { value: "YRI", label: "YRI — Yoruba in Ibadan, Nigeria" },
+  // Aggregate columns present in the pop_frequencies table
+  { value: "Non_African", label: "Non_African — All non-African populations" },
+  { value: "All", label: "All — All populations combined" },
 ];
 
 // ── Min-frequency options ────────────────────────────────────────────────
