@@ -38,30 +38,30 @@ function CliCommand({
 }) {
   return (
     <div className="mb-8">
-      <code className="text-sm bg-gray-100 font-mono px-1 font-semibold">{name}</code>
+      <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1 font-semibold">{name}</code>
       <p className="text-sm mt-1">{desc}</p>
       {flags.length > 0 && (
-        <table className="text-sm border border-black w-full mt-2">
+        <table className="text-sm border border-black dark:border-gray-500 w-full mt-2">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-black px-2 py-1 text-left font-semibold">Flag</th>
-              <th className="border border-black px-2 py-1 text-left font-semibold">Description</th>
+            <tr className="bg-gray-100 dark:bg-gray-800">
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Flag</th>
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Description</th>
             </tr>
           </thead>
           <tbody>
             {flags.map(([flag, description]) => (
               <tr key={flag}>
-                <td className="border border-black px-2 py-1 font-mono bg-gray-100 whitespace-nowrap">
+                <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800 whitespace-nowrap">
                   {flag}
                 </td>
-                <td className="border border-black px-2 py-1">{description}</td>
+                <td className="border border-black dark:border-gray-500 px-2 py-1">{description}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
       {example && (
-        <pre className="text-sm bg-gray-100 font-mono px-2 py-1 mt-2 overflow-x-auto">
+        <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-1 mt-2 overflow-x-auto">
           {example}
         </pre>
       )}
@@ -76,7 +76,7 @@ export default function CliRef() {
     <div className="max-w-4xl">
       {/* Intro paragraph */}
       <p className="text-sm mb-4">
-        The <code className="bg-gray-100 font-mono px-1">dbrip</code> CLI is a
+        The <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">dbrip</code> CLI is a
         thin wrapper around the REST API. Every command sends an HTTP request to
         the running API server — it never accesses the database directly.
       </p>
@@ -84,7 +84,7 @@ export default function CliRef() {
       {/* Installation */}
       <div className="mb-8">
         <p className="text-sm font-semibold mb-1">Installation</p>
-        <pre className="text-sm bg-gray-100 font-mono px-2 py-1 overflow-x-auto">
+        <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-1 overflow-x-auto">
 {`pip install -e ".[cli]"
 
 # Point the CLI at your API server (defaults to http://localhost:8000):
@@ -137,16 +137,16 @@ dbrip search --me-type ALU,SVA --limit 20`}
       <div className="mb-8">
         <p className="text-sm font-semibold mb-1">Region Shorthand</p>
         <p className="text-sm mb-2">
-          Use <code className="bg-gray-100 font-mono px-1">K</code> (thousands) and{" "}
-          <code className="bg-gray-100 font-mono px-1">M</code> (millions) as suffixes
+          Use <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">K</code> (thousands) and{" "}
+          <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">M</code> (millions) as suffixes
           in region coordinates. The CLI expands them to plain integers before
           sending the request.
         </p>
-        <table className="text-sm border border-black w-full">
+        <table className="text-sm border border-black dark:border-gray-500 w-full">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-black px-2 py-1 text-left font-semibold">Input</th>
-              <th className="border border-black px-2 py-1 text-left font-semibold">Expands to</th>
+            <tr className="bg-gray-100 dark:bg-gray-800">
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Input</th>
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Expands to</th>
             </tr>
           </thead>
           <tbody>
@@ -159,8 +159,8 @@ dbrip search --me-type ALU,SVA --limit 20`}
               ] as [string, string][]
             ).map(([input, expanded]) => (
               <tr key={input}>
-                <td className="border border-black px-2 py-1 font-mono bg-gray-100">{input}</td>
-                <td className="border border-black px-2 py-1 font-mono">{expanded}</td>
+                <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800">{input}</td>
+                <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono">{expanded}</td>
               </tr>
             ))}
           </tbody>
@@ -252,7 +252,7 @@ dbrip datasets --output json`}
           When stdout is piped (not a terminal), rich table formatting is
           automatically disabled so output stays clean for downstream tools.
         </p>
-        <pre className="text-sm bg-gray-100 font-mono px-2 py-2 overflow-x-auto">
+        <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-2 overflow-x-auto">
 {`# Count ALU insertions per chromosome
 dbrip export --format bed --me-type ALU | cut -f1 | sort | uniq -c | sort -rn
 

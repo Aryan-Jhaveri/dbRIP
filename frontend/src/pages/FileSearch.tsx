@@ -155,8 +155,8 @@ export default function FileSearch() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`border-2 border-dashed border-black px-6 py-8 text-center text-sm cursor-pointer mb-3 ${
-            isDragging ? "bg-gray-100" : "bg-white"
+          className={`border-2 border-dashed border-black dark:border-gray-500 px-6 py-8 text-center text-sm cursor-pointer mb-3 ${
+            isDragging ? "bg-gray-100 dark:bg-gray-700" : "bg-white dark:bg-gray-900"
           }`}
           onClick={() => document.getElementById("file-input")?.click()}
         >
@@ -192,9 +192,9 @@ export default function FileSearch() {
             min={0}
             value={windowBp}
             onChange={(e) => setWindowBp(Math.max(0, parseInt(e.target.value) || 0))}
-            className="border border-black px-2 py-1 text-sm w-24"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm w-24"
           />
-          <span className="text-xs text-gray-600">
+          <span className="text-xs text-gray-600 dark:text-gray-400">
             Extend each region by this many base pairs on each side
           </span>
         </div>
@@ -203,7 +203,7 @@ export default function FileSearch() {
         <button
           type="submit"
           disabled={!selectedFile || isLoading}
-          className="border border-black px-4 py-1 text-sm cursor-pointer hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="border border-black dark:border-gray-500 px-4 py-1 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? "Searching…" : "Search"}
         </button>
@@ -211,7 +211,7 @@ export default function FileSearch() {
 
       {/* ── Error ──────────────────────────────────────────────────────── */}
       {error && (
-        <p className="text-sm mb-4 border border-black px-3 py-2">
+        <p className="text-sm mb-4 border border-black dark:border-gray-500 px-3 py-2">
           Error: {error}
         </p>
       )}

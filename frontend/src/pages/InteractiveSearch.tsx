@@ -135,13 +135,13 @@ function PopFreqTable({ id }: { id: string }) {
      * Each cell is intentionally compact (px-2 py-0.5) to fit more columns.
      */
     <div className="overflow-x-auto">
-      <table className="border-collapse border border-black text-xs whitespace-nowrap">
+      <table className="border-collapse border border-black dark:border-gray-500 text-xs whitespace-nowrap">
         <thead>
-          <tr className="bg-white border-b border-black">
+          <tr className="bg-white dark:bg-gray-800 border-b border-black dark:border-gray-500">
             {data.populations.map((pf) => (
               <th
                 key={pf.population}
-                className="border border-black px-2 py-0.5 font-semibold text-center"
+                className="border border-black dark:border-gray-500 px-2 py-0.5 font-semibold text-center"
               >
                 {pf.population}
               </th>
@@ -153,7 +153,7 @@ function PopFreqTable({ id }: { id: string }) {
             {data.populations.map((pf) => (
               <td
                 key={pf.population}
-                className="border border-black px-2 py-0.5 text-center"
+                className="border border-black dark:border-gray-500 px-2 py-0.5 text-center"
               >
                 {pf.af !== null ? pf.af.toFixed(4) : "—"}
               </td>
@@ -313,7 +313,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           placeholder="e.g. ALU, INTRONIC, chr1 (case-insensitive)"
-          className="border border-black px-2 py-1 text-sm flex-1 max-w-md"
+          className="border border-black dark:border-gray-500 px-2 py-1 text-sm flex-1 max-w-md"
         />
         {searchInput && (
           <button
@@ -321,7 +321,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
               setSearchInput("");
               setSearchQuery("");
             }}
-            className="border border-black px-2 py-1 text-sm cursor-pointer hover:bg-gray-100"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             Clear
           </button>
@@ -341,7 +341,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
             setPopulation(e.target.value);
             setPageIndex(0);
           }}
-          className="border border-black px-2 py-1 text-sm"
+          className="border border-black dark:border-gray-500 px-2 py-1 text-sm"
         >
           <option value="">Any population</option>
           {POPULATIONS.map((p) => (
@@ -359,7 +359,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
             setPageIndex(0);
           }}
           disabled={!population}
-          className="border border-black px-2 py-1 text-sm disabled:opacity-40"
+          className="border border-black dark:border-gray-500 px-2 py-1 text-sm disabled:opacity-40"
         >
           {MIN_FREQ_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -384,7 +384,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
               setMeTypes(Array.from(e.target.selectedOptions, (o) => o.value));
               setPageIndex(0);
             }}
-            className="border border-black px-2 py-1 text-sm h-24"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm h-24"
           >
             {ME_TYPE_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -401,7 +401,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
               setMeCategories(Array.from(e.target.selectedOptions, (o) => o.value));
               setPageIndex(0);
             }}
-            className="border border-black px-2 py-1 text-sm h-24"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm h-24"
           >
             {CATEGORY_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -418,7 +418,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
               setAnnotations(Array.from(e.target.selectedOptions, (o) => o.value));
               setPageIndex(0);
             }}
-            className="border border-black px-2 py-1 text-sm h-24"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm h-24"
           >
             {ANNOTATION_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -441,7 +441,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
         <a
           href={exportUrl}
           download
-          className="border border-black px-3 py-1 text-sm no-underline hover:bg-gray-100 inline-block"
+          className="border border-black dark:border-gray-500 px-3 py-1 text-sm no-underline hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
         >
           Download CSV
         </a>
@@ -450,7 +450,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
           <button
             onClick={handleCopySelected}
             disabled={copyState === "loading"}
-            className="border border-black px-3 py-1 text-sm cursor-pointer hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="border border-black dark:border-gray-500 px-3 py-1 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {copyState === "loading"
               ? "Copying..."
@@ -470,7 +470,7 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
               const row = selectedRows[0];
               onViewInIgv(`${row.chrom}:${row.start}-${row.end}`);
             }}
-            className="border border-black px-3 py-1 text-sm cursor-pointer hover:bg-gray-100"
+            className="border border-black dark:border-gray-500 px-3 py-1 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
           >
             View in IGV
           </button>

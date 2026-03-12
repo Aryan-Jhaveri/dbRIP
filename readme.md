@@ -11,7 +11,7 @@ Currently hosting on : https://dbrip-api.onrender.com/ {Mar-12/2025 | API works 
 Most lab members only need this. Install the CLI directly from GitHub — no cloning required:
 
 ```bash
-pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP-API.git"
+pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"
 ```
 
 This installs the `dbrip` command and its two dependencies (`typer`, `httpx`). Nothing else from the repo is installed.
@@ -62,8 +62,8 @@ The web app is served from the same URL as the API. It has six tabs:
 If you want to run your own instance (e.g. on a lab server), the simplest path is Docker:
 
 ```bash
-git clone https://github.com/<org>/dbRIP-API.git
-cd dbRIP-API
+git clone https://github.com/Aryan-Jhaveri/dbRIP.git
+cd dbRIP
 docker build -t dbrip-api .
 docker run -p 8000:8000 dbrip-api
 ```

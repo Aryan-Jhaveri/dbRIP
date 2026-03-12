@@ -18,7 +18,7 @@
  *   - Plain text title and description
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import InteractiveSearch from "./pages/InteractiveSearch";
 import FileSearch from "./pages/FileSearch";
 import BatchSearch from "./pages/BatchSearch";
@@ -49,6 +49,31 @@ export default function App() {
   // Track which tab is currently active (default: Interactive Search)
   const [activeTab, setActiveTab] = useState<Tab>("interactive");
 
+  // ── Dark mode state ────────────────────────────────────────────────────
+  //
+  // Initialize from localStorage so the user's preference survives page reloads.
+  // If no preference is saved yet (first visit), fall back to the OS setting via
+  // window.matchMedia so new visitors automatically get the mode they expect.
+  //
+  // The initializer function runs once at mount — we wrap it in useState's lazy
+  // init form (() => ...) so it doesn't re-run on every render.
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem("darkMode");
+    if (saved !== null) return saved === "true";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+
+  // Apply or remove the "dark" class on <html> whenever darkMode changes.
+  // The @variant rule in index.css makes all dark: Tailwind classes respond to
+  // this class, so toggling it here cascades through the entire component tree.
+  // We also persist the choice to localStorage so it survives refreshes.
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("darkMode", String(darkMode));
+  }, [darkMode]);
+
+  const toggleDarkMode = useCallback(() => setDarkMode((d) => !d), []);
+
   // Locus passed to the IGV viewer when the user clicks "View in IGV" in
   // InteractiveSearch. Stored here (not in IgvViewer) because App.tsx owns
   // the tab-switching logic — it needs to switch to the igv tab AND pass the
@@ -65,33 +90,59 @@ export default function App() {
   return (
     <div className="max-w-screen-2xl mx-auto px-4 py-6">
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <h1 className="text-2xl font-bold">
-        dbRIP — Database of Retrotransposon Insertion Polymorphism
-      </h1>
-      <p className="mt-1 text-sm">
-        44,984 TE insertions across 33 populations (1000 Genomes, GRCh38).
-        For issues, contact: tl21xq@brocku.ca
-      </p>
+      {/*
+        * The header row uses flex with justify-between so the dark mode toggle
+        * button sits in the top-right corner on all screen sizes.
+        * min-w-0 on the text block prevents it from overflowing on small screens.
+        */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold">
+            dbRIP — Database of Retrotransposon Insertion Polymorphism
+          </h1>
+          <p className="mt-1 text-sm">
+            44,984 TE insertions across 33 populations (1000 Genomes, GRCh38).
+            For issues, contact: tl21xq@brocku.ca
+          </p>
+        </div>
+
+        {/* Dark mode toggle — persists preference in localStorage.
+            shrink-0 prevents the button from being squished by the title text. */}
+        <button
+          onClick={toggleDarkMode}
+          className="shrink-0 border border-black dark:border-gray-500 px-3 py-1 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-gray-100 whitespace-nowrap"
+          aria-label="Toggle dark mode"
+        >
+          {darkMode ? "Light mode" : "Dark mode"}
+        </button>
+      </div>
 
       {/* ── Tab navigation ─────────────────────────────────────────────── */}
-      <nav className="mt-6 border-b border-black flex gap-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 text-sm font-semibold border border-black border-b-0 cursor-pointer ${
-              activeTab === tab.id
-                ? "bg-black text-white"
-                : "bg-white text-black hover:bg-gray-100"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/*
+        * overflow-x-auto + whitespace-nowrap lets the 6 tabs scroll horizontally
+        * on narrow screens (phones) instead of wrapping and breaking the border
+        * design. On desktop all tabs are visible at once.
+        */}
+      <nav className="mt-6 border-b border-black dark:border-gray-500 overflow-x-auto">
+        <div className="flex">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 text-sm font-semibold border border-black dark:border-gray-500 border-b-0 cursor-pointer whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "bg-black text-white dark:bg-white dark:text-black"
+                  : "bg-white text-black hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
       {/* ── Tab content ────────────────────────────────────────────────── */}
-      <div className="border border-t-0 border-black p-4">
+      <div className="border border-t-0 border-black dark:border-gray-500 p-4 dark:bg-gray-900">
         {activeTab === "interactive" && <InteractiveSearch onViewInIgv={handleViewInIgv} />}
         {activeTab === "file" && <FileSearch />}
         {activeTab === "batch" && <BatchSearch />}

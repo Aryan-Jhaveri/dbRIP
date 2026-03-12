@@ -6,13 +6,38 @@
  *   Tailwind scans our .tsx files for class names like "p-4", "text-lg", etc.
  *   and generates only the CSS we actually use — keeping the bundle small.
  *
+ * DARK MODE:
+ *   We use CLASS-based dark mode instead of the default media-query approach.
+ *   The @variant directive below tells Tailwind: "activate dark: utility classes
+ *   whenever the element (or any ancestor) has the CSS class 'dark'."
+ *
+ *   App.tsx toggles that class on <html>:
+ *     document.documentElement.classList.toggle("dark", isDark)
+ *
+ *   On first load, App.tsx reads the user's saved preference from localStorage,
+ *   falling back to window.matchMedia("prefers-color-scheme: dark") so new
+ *   visitors automatically get the mode their OS prefers.
+ *
+ *   WHY class-based instead of media-query?
+ *     The media-query approach (@media (prefers-color-scheme: dark)) can't be
+ *     toggled by a button — it always mirrors the OS setting. Class-based lets
+ *     us do both: auto-detect on first visit AND let users override with a button.
+ *
  * DESIGN RULES:
- *   - Black and white only — no color whatsoever
+ *   - Black and white only in light mode; near-black/near-white in dark mode
  *   - System font stack (fast loading, native feel on every OS)
  *   - Simple, functional research-tool aesthetic
  */
 
 @import "tailwindcss";
+
+/*
+ * Override Tailwind's built-in dark variant to use class-based detection.
+ * Without this, dark: classes would only activate via @media prefers-color-scheme.
+ * With this, they activate whenever an ancestor has class="dark" — which App.tsx
+ * adds/removes on <html> when the user clicks the Dark Mode toggle.
+ */
+@variant dark (&:where(.dark, .dark *));
 
 /* ── Base styles ────────────────────────────────────────────────────────── */
 
@@ -31,6 +56,23 @@ body {
   padding: 0;
 }
 
+/*
+ * Dark mode base styles — applied when <html class="dark">.
+ *
+ * color-scheme: dark is the key property here. It tells the browser to render
+ * ALL native UI controls (scrollbars, form inputs, checkboxes, select dropdowns)
+ * in dark mode automatically, without us having to style each one individually.
+ * This is far cleaner than adding dark:bg-gray-800 to every <input> and <select>.
+ */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  color: #e5e5e5;
+  background: #111111;
+}
+
 /* ── Links ──────────────────────────────────────────────────────────────── */
 
 a {
@@ -40,4 +82,12 @@ a {
 
 a:hover {
   color: #333;
+}
+
+html.dark a {
+  color: #d1d5db;
+}
+
+html.dark a:hover {
+  color: #9ca3af;
 }

@@ -170,7 +170,7 @@ export default function BatchSearch() {
   const exportUrl = buildExportUrl("csv", exportParams);
 
   return (
-    <div className="flex gap-8">
+    <div className="flex flex-col sm:flex-row gap-8">
       {/* ── Left column: Category, ME Family, Annotation ───────────────── */}
       <div className="flex-1">
         <CheckboxGroup
@@ -204,7 +204,7 @@ export default function BatchSearch() {
               <select
                 value={population}
                 onChange={(e) => setPopulation(e.target.value)}
-                className="border border-black px-2 py-1 text-sm"
+                className="border border-black dark:border-gray-500 px-2 py-1 text-sm"
               >
                 <option value="">Any population</option>
                 {POPULATIONS.map((p) => (
@@ -220,7 +220,7 @@ export default function BatchSearch() {
                 value={minFreq}
                 onChange={(e) => setMinFreq(e.target.value)}
                 disabled={!population}
-                className="border border-black px-2 py-1 text-sm disabled:opacity-40"
+                className="border border-black dark:border-gray-500 px-2 py-1 text-sm disabled:opacity-40"
               >
                 {MIN_FREQ_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -237,7 +237,7 @@ export default function BatchSearch() {
           <a
             href={exportUrl}
             download
-            className="border border-black px-3 py-1 text-sm no-underline hover:bg-gray-100 inline-block"
+            className="border border-black dark:border-gray-500 px-3 py-1 text-sm no-underline hover:bg-gray-100 dark:hover:bg-gray-700 inline-block"
           >
             Download
           </a>
@@ -256,7 +256,7 @@ export default function BatchSearch() {
         {/* Genome version — locked to GRCh38 for now */}
         <div className="mb-4">
           <label className="text-sm font-semibold block mb-1">By Genome Version:</label>
-          <select className="border border-black px-2 py-1 text-sm" disabled>
+          <select className="border border-black dark:border-gray-500 px-2 py-1 text-sm" disabled>
             <option>GRCh38</option>
           </select>
         </div>
@@ -264,7 +264,7 @@ export default function BatchSearch() {
         {/* Organism — locked to Human for now */}
         <div className="mb-4">
           <label className="text-sm font-semibold block mb-1">By Organism:</label>
-          <select className="border border-black px-2 py-1 text-sm" disabled>
+          <select className="border border-black dark:border-gray-500 px-2 py-1 text-sm" disabled>
             <option>Human</option>
           </select>
         </div>
@@ -281,7 +281,7 @@ export default function BatchSearch() {
               );
               setChromosomes(selected);
             }}
-            className="border border-black px-2 py-1 text-sm w-full h-32"
+            className="border border-black dark:border-gray-500 px-2 py-1 text-sm w-full h-32"
           >
             {CHROMOSOMES.map((opt) => (
               <option key={opt.value} value={opt.value}>

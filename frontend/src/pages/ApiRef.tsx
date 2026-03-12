@@ -43,8 +43,8 @@ function Endpoint({
   return (
     <div className="mb-8">
       <div className="flex items-baseline gap-2">
-        <span className="text-xs font-semibold border border-black px-1">{method}</span>
-        <code className="text-sm bg-gray-100 font-mono px-1">{path}</code>
+        <span className="text-xs font-semibold border border-black dark:border-gray-500 px-1">{method}</span>
+        <code className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-1">{path}</code>
       </div>
       <p className="text-sm mt-1">{desc}</p>
       {children && <div className="mt-2">{children}</div>}
@@ -62,20 +62,20 @@ function Endpoint({
  */
 function ParamsTable({ rows }: { rows: [string, string, string][] }) {
   return (
-    <table className="text-sm border border-black w-full">
+    <table className="text-sm border border-black dark:border-gray-500 w-full">
       <thead>
-        <tr className="bg-gray-100">
-          <th className="border border-black px-2 py-1 text-left font-semibold">Parameter</th>
-          <th className="border border-black px-2 py-1 text-left font-semibold">Type</th>
-          <th className="border border-black px-2 py-1 text-left font-semibold">Description</th>
+        <tr className="bg-gray-100 dark:bg-gray-800">
+          <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Parameter</th>
+          <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Type</th>
+          <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">Description</th>
         </tr>
       </thead>
       <tbody>
         {rows.map(([name, type, description]) => (
           <tr key={name}>
-            <td className="border border-black px-2 py-1 font-mono bg-gray-100">{name}</td>
-            <td className="border border-black px-2 py-1 text-gray-600">{type}</td>
-            <td className="border border-black px-2 py-1">{description}</td>
+            <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800">{name}</td>
+            <td className="border border-black dark:border-gray-500 px-2 py-1 text-gray-600 dark:text-gray-400">{type}</td>
+            <td className="border border-black dark:border-gray-500 px-2 py-1">{description}</td>
           </tr>
         ))}
       </tbody>
@@ -94,7 +94,7 @@ function ParamsTable({ rows }: { rows: [string, string, string][] }) {
  */
 function Example({ code }: { code: string }) {
   return (
-    <pre className="text-sm bg-gray-100 font-mono px-2 py-2 mt-2 overflow-x-auto whitespace-pre">
+    <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-2 mt-2 overflow-x-auto whitespace-pre">
       {code}
     </pre>
   );
@@ -109,12 +109,12 @@ export default function ApiRef() {
       <p className="text-sm mb-2">
         All endpoints are read-only — no writes to the database. curl examples
         below use{" "}
-        <code className="bg-gray-100 font-mono px-1">http://localhost:8000</code>
+        <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">http://localhost:8000</code>
         . Replace this with your server's address when deployed.
       </p>
       <p className="text-sm mb-6">
         The frontend sends relative{" "}
-        <code className="bg-gray-100 font-mono px-1">/v1/*</code> paths; the
+        <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">/v1/*</code> paths; the
         Vite dev proxy forwards these to the API at port 8000. In production
         both are served from the same origin so no proxy is needed.
       </p>
@@ -481,18 +481,18 @@ curl "http://localhost:8000/v1/stats?by=chrom"`}
         <p className="text-sm font-semibold mb-2">Error Responses</p>
         <p className="text-sm mb-2">
           All errors return JSON with a{" "}
-          <code className="bg-gray-100 font-mono px-1">detail</code> field:
+          <code className="bg-gray-100 dark:bg-gray-800 font-mono px-1">detail</code> field:
         </p>
-        <pre className="text-sm bg-gray-100 font-mono px-2 py-2 mb-2 overflow-x-auto">
+        <pre className="text-sm bg-gray-100 dark:bg-gray-800 font-mono px-2 py-2 mb-2 overflow-x-auto">
           {'{"detail": "Insertion FAKE123 not found"}'}
         </pre>
-        <table className="text-sm border border-black w-full">
+        <table className="text-sm border border-black dark:border-gray-500 w-full">
           <thead>
-            <tr className="bg-gray-100">
-              <th className="border border-black px-2 py-1 text-left font-semibold">
+            <tr className="bg-gray-100 dark:bg-gray-800">
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">
                 Status
               </th>
-              <th className="border border-black px-2 py-1 text-left font-semibold">
+              <th className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold">
                 Meaning
               </th>
             </tr>
@@ -506,10 +506,10 @@ curl "http://localhost:8000/v1/stats?by=chrom"`}
               ] as [string, string][]
             ).map(([status, meaning]) => (
               <tr key={status}>
-                <td className="border border-black px-2 py-1 font-mono bg-gray-100">
+                <td className="border border-black dark:border-gray-500 px-2 py-1 font-mono bg-gray-100 dark:bg-gray-800">
                   {status}
                 </td>
-                <td className="border border-black px-2 py-1">{meaning}</td>
+                <td className="border border-black dark:border-gray-500 px-2 py-1">{meaning}</td>
               </tr>
             ))}
           </tbody>

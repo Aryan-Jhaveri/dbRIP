@@ -335,16 +335,21 @@ export default function DataTable<TData>({
   return (
     <div>
       {/* ── Pagination controls ────────────────────────────────────────── */}
-      <div className="mt-2 flex items-center justify-between text-sm">
-        {/* Left side: showing X–Y of Z */}
+      {/*
+        * flex-wrap lets the controls break into two lines on narrow screens
+        * instead of overflowing. The "showing X–Y" label and the navigation
+        * controls each get their own line on mobile, side-by-side on desktop.
+        */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+        {/* Showing X–Y of Z */}
         <span>
           {total === 0
             ? "No results"
             : `Showing ${firstRow} to ${lastRow} of ${total.toLocaleString()} entries`}
         </span>
 
-        {/* Right side: page size selector + prev/next buttons */}
-        <div className="flex items-center gap-2">
+        {/* Page size + navigation — also wraps internally via flex-wrap */}
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           {/* Page size dropdown */}
           <label>
             Show{" "}
@@ -354,7 +359,7 @@ export default function DataTable<TData>({
                 // When page size changes, reset to first page
                 onPaginationChange(0, Number(e.target.value));
               }}
-              className="border border-black px-1 py-0.5"
+              className="border border-black dark:border-gray-500 px-1 py-0.5"
             >
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
@@ -369,7 +374,7 @@ export default function DataTable<TData>({
           <button
             onClick={() => onPaginationChange(pageIndex - 1, pageSize)}
             disabled={pageIndex === 0}
-            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+            className="border border-black dark:border-gray-500 px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
             Previous
           </button>
@@ -405,7 +410,7 @@ export default function DataTable<TData>({
                     setGoToInput("");
                   }
                 }}
-                className="border border-black px-1 py-0.5 w-14 text-center"
+                className="border border-black dark:border-gray-500 px-1 py-0.5 w-14 text-center"
               />
             </label>
           )}
@@ -414,7 +419,7 @@ export default function DataTable<TData>({
           <button
             onClick={() => onPaginationChange(pageIndex + 1, pageSize)}
             disabled={pageIndex >= pageCount - 1}
-            className="border border-black px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+            className="border border-black dark:border-gray-500 px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
             Next
           </button>
@@ -423,18 +428,18 @@ export default function DataTable<TData>({
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse border border-black text-sm">
+        <table className="w-full border-collapse border border-black dark:border-gray-500 text-sm">
           {/* Table header */}
           <thead>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-black bg-white">
+              <tr key={headerGroup.id} className="border-b border-black dark:border-gray-500 bg-white dark:bg-gray-800">
                 {/* Checkbox column header — only shown when renderExpandedRow is provided.
                     This checkbox controls expanding/collapsing ALL rows on this page:
                     - checked = all rows expanded
                     - indeterminate = some (but not all) rows expanded
                     - unchecked = no rows expanded */}
                 {renderExpandedRow && (
-                  <th className="border border-black px-2 py-1 text-center align-middle">
+                  <th className="border border-black dark:border-gray-500 px-2 py-1 text-center align-middle">
                     {/* "Pop Freq" label stacked above the expand-all checkbox */}
                     <span className="block text-xs font-semibold whitespace-nowrap mb-0.5">
                       Pop Freq
@@ -463,7 +468,7 @@ export default function DataTable<TData>({
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="border border-black px-2 py-1 text-left font-semibold whitespace-nowrap"
+                    className="border border-black dark:border-gray-500 px-2 py-1 text-left font-semibold whitespace-nowrap"
                   >
                     {header.isPlaceholder
                       ? null
@@ -480,7 +485,7 @@ export default function DataTable<TData>({
               <tr>
                 <td
                   colSpan={totalCols}
-                  className="border border-black px-2 py-4 text-center"
+                  className="border border-black dark:border-gray-500 px-2 py-4 text-center"
                 >
                   Loading...
                 </td>
@@ -489,7 +494,7 @@ export default function DataTable<TData>({
               <tr>
                 <td
                   colSpan={totalCols}
-                  className="border border-black px-2 py-4 text-center"
+                  className="border border-black dark:border-gray-500 px-2 py-4 text-center"
                 >
                   No results found.
                 </td>
@@ -504,14 +509,16 @@ export default function DataTable<TData>({
                 // The main data row.
                 // - cursor-pointer signals the whole row is clickable (for blue highlight).
                 // - onMouseDown starts selection / drag; onMouseEnter continues a drag.
-                // - bg-blue-200 when selected (deeper blue), hover:bg-blue-50 when not.
+                // - bg-blue-200/dark:bg-blue-900 when selected, blue hover when not.
                 const dataRow = (
                   <tr
                     key={row.id}
                     onMouseDown={(e) => handleRowMouseDown(e, row.id, row.index)}
                     onMouseEnter={() => handleRowMouseEnter(row.id)}
-                    className={`border-b border-black cursor-pointer ${
-                      isSelected ? "bg-blue-200" : "hover:bg-blue-50"
+                    className={`border-b border-black dark:border-gray-600 cursor-pointer ${
+                      isSelected
+                        ? "bg-blue-200 dark:bg-blue-900"
+                        : "hover:bg-blue-50 dark:hover:bg-blue-950"
                     }`}
                   >
                     {/* Per-row expand checkbox — only when renderExpandedRow is provided.
@@ -520,7 +527,7 @@ export default function DataTable<TData>({
                         handleCheckboxClick (onClick) for toggle + shift-range logic. */}
                     {renderExpandedRow && (
                       <td
-                        className="border border-black px-2 py-1 w-8 text-center"
+                        className="border border-black dark:border-gray-500 px-2 py-1 w-8 text-center"
                         onMouseDown={(e) => e.stopPropagation()}
                       >
                         <input
@@ -538,7 +545,7 @@ export default function DataTable<TData>({
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className="border border-black px-2 py-1 whitespace-nowrap"
+                        className="border border-black dark:border-gray-500 px-2 py-1 whitespace-nowrap"
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
@@ -555,7 +562,7 @@ export default function DataTable<TData>({
                     <tr key={`${row.id}-expanded`}>
                       <td
                         colSpan={totalCols}
-                        className="border border-black bg-gray-50 px-4 py-2"
+                        className="border border-black dark:border-gray-500 bg-gray-50 dark:bg-gray-800 px-4 py-2"
                       >
                         {renderExpandedRow(row.original)}
                       </td>
