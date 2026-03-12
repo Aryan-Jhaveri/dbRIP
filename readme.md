@@ -3,12 +3,25 @@
 Read-only REST API for the [dbRIP database](https://lianglab.shinyapps.io/shinydbRIP/) of retrotransposon insertion polymorphisms — 44,984 TE insertions across 33 populations from the 1000 Genomes Project.
 
 ## Quick Start
+1. Installation
+
+We use optional dependencies to keep the installation lean. Choose the one that fits your task:
+| If you want to...	| Run this command |
+| ------------------|----------------|
+| Develop/Test everything	| ` pip install -e ".[all,dev]" ` | 
+| Just run the API server	| ` pip install -e ".[api]" ` | 
+| Just run the Ingest scripts	| ` pip install -e ".[ingest]" ` | 
+| Use the CLI tool | ` pip install -e ".[cli]" ` | 
+
 
 ```bash
 # 1. Set up Python environment
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+
+# Installing what we need, here we're doing all to show how 
+# the pipe works for developing everything
+pip install -e ".[all,dev]"
 
 # 2. Load the data into SQLite
 python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
