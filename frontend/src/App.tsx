@@ -22,13 +22,15 @@ import { useState } from "react";
 import InteractiveSearch from "./pages/InteractiveSearch";
 import FileSearch from "./pages/FileSearch";
 import BatchSearch from "./pages/BatchSearch";
+import ApiRef from "./pages/ApiRef";
+import CliRef from "./pages/CliRef";
 
 /**
  * Tab identifiers — used to track which tab is currently active.
  * Using a union type instead of an enum because it's simpler and
  * TypeScript can still enforce that only valid values are used.
  */
-type Tab = "interactive" | "file" | "batch";
+type Tab = "interactive" | "file" | "batch" | "api-ref" | "cli-ref";
 
 /**
  * Tab metadata — label shown in the tab bar, and which tab it corresponds to.
@@ -37,6 +39,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "interactive", label: "Interactive Search" },
   { id: "file", label: "File Search" },
   { id: "batch", label: "Batch Search" },
+  { id: "api-ref", label: "API Reference" },
+  { id: "cli-ref", label: "CLI Reference" },
 ];
 
 export default function App() {
@@ -76,6 +80,8 @@ export default function App() {
         {activeTab === "interactive" && <InteractiveSearch />}
         {activeTab === "file" && <FileSearch />}
         {activeTab === "batch" && <BatchSearch />}
+        {activeTab === "api-ref" && <ApiRef />}
+        {activeTab === "cli-ref" && <CliRef />}
       </div>
     </div>
   );
