@@ -34,11 +34,22 @@
 
     // Report errors for locally declared variables/imports that are never used.
     // Helps keep code clean; unused imports are almost always mistakes.
-    "noUnusedLocals": true
+    "noUnusedLocals": true,
+
+    // Required because source files use .ts extensions in import paths
+    // (e.g., import from "./tools/insertions.ts"). This is necessary because
+    // node --experimental-strip-types resolves imports literally — it looks
+    // for the actual .ts file, not a .js→.ts substitution.
+    //
+    // TRADEOFF: allowImportingTsExtensions requires noEmit (TypeScript cannot
+    // emit .js files that contain .ts import paths, since they'd fail at runtime).
+    // Production deployment therefore runs the TypeScript source directly using
+    // node --experimental-strip-types (Node 22+) rather than compiled JS.
+    "allowImportingTsExtensions": true,
+    "noEmit": true
 
     // NOTE: Unlike frontend/tsconfig.app.json, this file does NOT have:
     //   "lib": ["DOM"]  — we use Node globals (fetch, URLSearchParams) from @types/node
-    //   "noEmit": true  — we DO emit files for production builds
     //   "jsx": ...      — no React in the MCP server
   },
 

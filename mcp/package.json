@@ -6,8 +6,8 @@
   "main": "dist/server.js",
   "scripts": {
     "dev":       "node --experimental-strip-types server.ts",
-    "build":     "tsc",
-    "start":     "node dist/server.js",
+    "build":     "tsc --noEmit",
+    "start":     "node --experimental-strip-types server.ts",
     "typecheck": "tsc --noEmit",
     "inspect":   "npx @modelcontextprotocol/inspector"
   },
