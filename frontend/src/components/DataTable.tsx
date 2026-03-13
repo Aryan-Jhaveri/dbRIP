@@ -348,25 +348,27 @@ export default function DataTable<TData>({
             : `Showing ${firstRow} to ${lastRow} of ${total.toLocaleString()} entries`}
         </span>
 
-        {/* Page size + navigation — also wraps internally via flex-wrap */}
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
+        {/* Page size + navigation — also wraps internally via flex-wrap.
+            All interactive elements use h-8 so browser-native <select> height
+            and styled <button> height are forced to match exactly. */}
+        <div className="flex flex-wrap items-center gap-3 ml-auto">
           {/* Page size dropdown */}
-          <label>
-            Show{" "}
+          <label className="flex items-center gap-2">
+            Show
             <select
               value={pageSize}
               onChange={(e) => {
                 // When page size changes, reset to first page
                 onPaginationChange(0, Number(e.target.value));
               }}
-              className="border border-black dark:border-gray-500 px-1 py-0.5"
+              className="border border-black dark:border-gray-500 px-2 h-8"
             >
               {PAGE_SIZES.map((size) => (
                 <option key={size} value={size}>
                   {size}
                 </option>
               ))}
-            </select>{" "}
+            </select>
             entries
           </label>
 
@@ -374,7 +376,7 @@ export default function DataTable<TData>({
           <button
             onClick={() => onPaginationChange(pageIndex - 1, pageSize)}
             disabled={pageIndex === 0}
-            className="border border-black dark:border-gray-500 px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+            className="border border-black dark:border-gray-500 px-4 h-8 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
             Previous
           </button>
@@ -388,7 +390,7 @@ export default function DataTable<TData>({
               without clicking Next/Previous repeatedly. We clamp the entered
               value to [1, pageCount] so out-of-range inputs don't break anything. */}
           {pageCount > 1 && (
-            <label className="flex items-center gap-1">
+            <label className="flex items-center gap-2">
               Go to:
               <input
                 type="number"
@@ -410,7 +412,7 @@ export default function DataTable<TData>({
                     setGoToInput("");
                   }
                 }}
-                className="border border-black dark:border-gray-500 px-1 py-0.5 w-14 text-center"
+                className="border border-black dark:border-gray-500 px-2 h-8 w-16 text-center"
               />
             </label>
           )}
@@ -419,7 +421,7 @@ export default function DataTable<TData>({
           <button
             onClick={() => onPaginationChange(pageIndex + 1, pageSize)}
             disabled={pageIndex >= pageCount - 1}
-            className="border border-black dark:border-gray-500 px-2 py-0.5 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
+            className="border border-black dark:border-gray-500 px-4 h-8 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"
           >
             Next
           </button>
