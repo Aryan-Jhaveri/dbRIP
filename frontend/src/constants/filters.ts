@@ -119,3 +119,33 @@ export const STRAND_OPTIONS: FilterOption[] = [
   { value: "-",    label: "Negative (−)" },
   { value: "null", label: "Undetermined" },
 ];
+
+// ── Population groups ─────────────────────────────────────────────────────
+// Defines how the 33 population columns are grouped in the PopFreqTable.
+// Each group has a label (the region name shown as a spanning header) and
+// a list of population codes in left-to-right display order.
+//
+// WHY THIS LIVES HERE (not in InteractiveSearch.tsx):
+//   PopFreqTable needs this to render grouped headers and toggle buttons.
+//   Keeping it next to the flat POPULATIONS list means there is one place
+//   to update if the 1000 Genomes population structure ever changes.
+//
+// ORDER MATTERS:
+//   Groups appear left-to-right in the table.  Within each group, the
+//   first entry is the super-population aggregate (e.g. "AFR") — it gets
+//   a distinct background in the table — followed by its sub-populations.
+//   The "Aggregates" group is an exception: both "All" and "Non_African"
+//   are cross-population aggregates, not a super-pop + sub-pops pair.
+//
+// VERIFIED AGAINST: data/manifests/dbrip_v1.yaml population_columns
+//   Aggregates: 2 cols | AFR: 8 cols | AMR: 5 cols | EAS: 6 cols |
+//   EUR: 6 cols | SAS: 6 cols  →  total 33 ✓
+
+export const POP_GROUPS: { label: string; pops: string[] }[] = [
+  { label: "Aggregates", pops: ["All", "Non_African"] },
+  { label: "AFR",        pops: ["AFR", "ACB", "ASW", "ESN", "GWD", "LWK", "MSL", "YRI"] },
+  { label: "AMR",        pops: ["AMR", "CLM", "MXL", "PEL", "PUR"] },
+  { label: "EAS",        pops: ["EAS", "CDX", "CHB", "CHS", "JPT", "KHV"] },
+  { label: "EUR",        pops: ["EUR", "CEU", "FIN", "GBR", "IBS", "TSI"] },
+  { label: "SAS",        pops: ["SAS", "BEB", "GIH", "ITU", "PJL", "STU"] },
+];

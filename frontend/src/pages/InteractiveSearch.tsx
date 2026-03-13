@@ -82,6 +82,7 @@ import {
   ME_TYPE_OPTIONS,
   CATEGORY_OPTIONS,
   ANNOTATION_OPTIONS,
+  POP_GROUPS,
 } from "../constants/filters";
 
 // ── Column definitions ────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ const columns: ColumnDef<InsertionSummary, unknown>[] = [
 
 // ── PopFreqTable ─────────────────────────────────────────────────────────
 //
-// Renders a horizontal population frequency table for a single insertion.
+// Renders a grouped population frequency table for a single insertion.
 // This is shown inline below a row when the user checks that row's checkbox.
 //
 // WHY A SEPARATE COMPONENT?
@@ -118,49 +119,116 @@ const columns: ColumnDef<InsertionSummary, unknown>[] = [
 //
 // CACHING:
 //   useInsertion uses TanStack Query with the insertion ID as the cache key.
-//   If the user already expanded this row on a previous visit (or the old popup
-//   system loaded it), the data is already cached and renders instantly.
+//   If the user already expanded this row on a previous visit the data is
+//   already cached and renders instantly.
+//
+// LAYOUT (3-row table):
+//   Row 1 — group headers (colSpan across each group's columns, thick border)
+//   Row 2 — individual population codes
+//   Row 3 — AF values
+//
+// The toggle buttons above the table let users hide/show entire groups.
 
-function PopFreqTable({ id }: { id: string }) {
+// The five super-population codes. Their cells get a distinct background
+// so they stand out visually from the sub-population cells to their right.
+const SUPER_POPS = new Set(["AFR", "AMR", "EAS", "EUR", "SAS"]);
+
+// PopFreqTable is now purely presentational — it receives activeGroups from
+// the parent (InteractiveSearch) so all expanded rows stay in sync with the
+// single global toggle bar.  It no longer owns any state of its own.
+function PopFreqTable({ id, activeGroups }: { id: string; activeGroups: Set<string> }) {
   const { data, isLoading } = useInsertion(id);
 
   if (isLoading) return <p className="text-xs">Loading...</p>;
   if (!data) return null;
 
+  // Build a fast lookup: population code → AF value.
+  // Avoids O(n²) scanning inside the render loops below.
+  const freqMap = new Map(data.populations.map((pf) => [pf.population, pf.af]));
+
+  // Only render the groups the user has toggled on.
+  const visibleGroups = POP_GROUPS.filter((g) => activeGroups.has(g.label));
+
   return (
-    /*
-     * Horizontal layout: population codes as <th> in the header row,
-     * AF values as <td> in the data row. With 33 columns this is wider
-     * than the card, so overflow-x: auto lets the user scroll sideways.
-     * Each cell is intentionally compact (px-2 py-0.5) to fit more columns.
-     */
-    <div className="overflow-x-auto">
-      <table className="border-collapse border border-black dark:border-gray-500 text-xs whitespace-nowrap">
-        <thead>
-          <tr className="bg-white dark:bg-gray-800 border-b border-black dark:border-gray-500">
-            {data.populations.map((pf) => (
-              <th
-                key={pf.population}
-                className="border border-black dark:border-gray-500 px-2 py-0.5 font-semibold text-center"
-              >
-                {pf.population}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            {data.populations.map((pf) => (
-              <td
-                key={pf.population}
-                className="border border-black dark:border-gray-500 px-2 py-0.5 text-center"
-              >
-                {pf.af !== null ? pf.af.toFixed(4) : "—"}
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
+    <div className="text-xs">
+      {/* ── Grouped table ────────────────────────────────────────────────
+          With 33 columns this is wider than its container, so overflow-x
+          lets the user scroll sideways. border-collapse merges adjacent
+          cell borders so the thick group-separator borders appear as a
+          single thick line rather than two thin lines side-by-side. */}
+      {visibleGroups.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="border-collapse text-xs whitespace-nowrap">
+            <thead>
+              {/* Row 1 — one cell per group, spanning all of that group's columns */}
+              <tr>
+                {visibleGroups.map((g) => (
+                  <th
+                    key={g.label}
+                    colSpan={g.pops.length}
+                    className="border-2 border-black dark:border-gray-300 px-2 py-0.5 text-center font-bold bg-gray-100 dark:bg-gray-800"
+                  >
+                    {g.label}
+                  </th>
+                ))}
+              </tr>
+              {/* Row 2 — one cell per population code.
+                  border-l-2 on the first column of each group marks the
+                  group boundary with a thick vertical left border. */}
+              <tr>
+                {visibleGroups.map((g) =>
+                  g.pops.map((pop, i) => (
+                    <th
+                      key={pop}
+                      className={[
+                        "px-2 py-0.5 text-center border border-black dark:border-gray-500",
+                        i === 0 ? "border-l-2 border-l-black dark:border-l-gray-300" : "",
+                        SUPER_POPS.has(pop)
+                          ? "font-semibold bg-gray-50 dark:bg-gray-700"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
+                      {pop}
+                    </th>
+                  ))
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {/* Row 3 — AF values, styled to match their header cell */}
+              <tr>
+                {visibleGroups.map((g) =>
+                  g.pops.map((pop, i) => {
+                    const af = freqMap.get(pop);
+                    return (
+                      <td
+                        key={pop}
+                        className={[
+                          "px-2 py-0.5 text-center border border-black dark:border-gray-500",
+                          i === 0 ? "border-l-2 border-l-black dark:border-l-gray-300" : "",
+                          SUPER_POPS.has(pop)
+                            ? "font-semibold bg-gray-50 dark:bg-gray-700"
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
+                        {af != null ? af.toFixed(4) : "—"}
+                      </td>
+                    );
+                  })
+                )}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400">
+          No groups selected — click a button above to show columns.
+        </p>
+      )}
     </div>
   );
 }
@@ -210,6 +278,21 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
 
   // Copy button state machine: idle → loading (fetching pop data) → done (flash "Copied!") → idle
   const [copyState, setCopyState] = useState<"idle" | "loading" | "done">("idle");
+
+  // activeGroups: which population groups are shown in the PopFreqTable rows.
+  // Kept here (not in PopFreqTable) so that ALL expanded rows share one global
+  // toggle bar — toggling AFR off hides that column in every open row at once.
+  const [activeGroups, setActiveGroups] = useState<Set<string>>(
+    () => new Set(POP_GROUPS.map((g) => g.label))
+  );
+
+  const toggleGroup = useCallback((label: string) => {
+    setActiveGroups((prev) => {
+      const next = new Set(prev);
+      next.has(label) ? next.delete(label) : next.add(label);
+      return next;
+    });
+  }, []);
 
   // ── Debounce search ──────────────────────────────────────────────────
   // Wait 300ms after the user stops typing before sending the request.
@@ -480,6 +563,41 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
         )}
       </div>
 
+      {/* ── Population group toggles ────────────────────────────────────── */}
+      {/* Global controls: one set of buttons that applies to EVERY expanded row.
+          Clicking "AFR" here hides/shows the AFR columns in all open rows at once,
+          so users don't have to repeat the same toggle for each row they expand.
+          "All" / "None" are shortcut buttons to show or hide everything at once. */}
+      <div className="mt-3 flex flex-wrap gap-1 items-center">
+        <span className="text-sm font-semibold mr-1">Pop Freq Groups:</span>
+        <button
+          onClick={() => setActiveGroups(new Set(POP_GROUPS.map((g) => g.label)))}
+          className="px-2 py-0.5 border border-black dark:border-gray-400 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          All
+        </button>
+        <button
+          onClick={() => setActiveGroups(new Set())}
+          className="px-2 py-0.5 border border-black dark:border-gray-400 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          None
+        </button>
+        <span className="mx-1 text-gray-400">|</span>
+        {POP_GROUPS.map((g) => (
+          <button
+            key={g.label}
+            onClick={() => toggleGroup(g.label)}
+            className={
+              activeGroups.has(g.label)
+                ? "px-2 py-0.5 text-xs cursor-pointer bg-black text-white dark:bg-white dark:text-black"
+                : "px-2 py-0.5 text-xs cursor-pointer bg-white text-black border border-black hover:bg-gray-100 dark:bg-gray-900 dark:text-gray-100"
+            }
+          >
+            {g.label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Data table ─────────────────────────────────────────────────── */}
       {/* data.results comes directly from the API — no client-side filtering.
           data.total is the server-side count of matching rows, so pagination
@@ -495,7 +613,9 @@ export default function InteractiveSearch({ onViewInIgv }: InteractiveSearchProp
         onPaginationChange={handlePaginationChange}
         isLoading={isLoading}
         onSelectionChange={setSelectedRows}
-        renderExpandedRow={(row) => <PopFreqTable id={(row as InsertionSummary).id} />}
+        renderExpandedRow={(row) => (
+          <PopFreqTable id={(row as InsertionSummary).id} activeGroups={activeGroups} />
+        )}
       />
     </div>
   );
