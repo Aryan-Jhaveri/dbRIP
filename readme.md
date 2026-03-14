@@ -2,7 +2,8 @@
 
 Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project.
 
-Hosted at: https://dbrip-api.onrender.com/
+GitHub: https://github.com/Aryan-Jhaveri/dbRIP
+Currently hosted at: https://dbrip-api.onrender.com/
 
 ---
 
@@ -12,26 +13,42 @@ The project ships as four independent components. Install only what you need:
 
 | Component | What it is | How to get it |
 |-----------|-----------|---------------|
-| **CLI** | `dbrip` terminal tool — search, export, stats | `pip install "dbrip-api[cli] @ git+..."` |
+| **CLI** | `dbrip` terminal tool — search, export, stats | `pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"` |
 | **MCP** | Claude connector — query the DB in natural language | Claude Desktop config (no install) |
-| **API** | FastAPI backend + REST endpoints | `pip install "dbrip-api[api] @ git+..."` |
+| **API** | FastAPI backend + REST endpoints | `pip install "dbrip-api[api] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"` |
 | **Frontend** | React web app (6 tabs, IGV viewer) | Served by the API; built into the Docker image |
 | **Full stack** | Everything above, one container | `docker run` or Render blueprint |
 
-All components talk to the same hosted API at `https://dbrip-api.onrender.com/v1`. The CLI and MCP work out of the box against the hosted server — no local setup needed.
+All components default to `http://localhost:8000` and work the same way whether running locally or against a remote server — just swap the URL. Currently also hosted at `https://dbrip-api.onrender.com` (replace `localhost` references below with that to skip local setup).
 
 ---
 
 ## CLI
 
-Most lab members only need this. Install directly from GitHub — no cloning required:
+Most lab members only need this. No cloning required — installs straight from GitHub.
 
+**1. Install**
 ```bash
 pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"
+```
+
+This installs the `dbrip` command and its two dependencies (`typer`, `httpx`). Nothing else from the repo is pulled in.
+
+**2. Point it at a server**
+```bash
+# Use the hosted instance (no local setup needed):
 export DBRIP_API_URL=https://dbrip-api.onrender.com
+
+# Or a local instance if you're running the API yourself:
+export DBRIP_API_URL=http://localhost:8000
 ```
 
 Add the `export` line to `~/.bashrc` or `~/.zshrc` to make it permanent.
+
+**3. Verify**
+```bash
+dbrip datasets   # should print dbrip_v1 with row_count 44984
+```
 
 ```bash
 # Search by region and TE type
@@ -55,7 +72,7 @@ Add `--output json` to any command for pipe-friendly JSON instead of a table.
 
 ## MCP (Claude connector)
 
-Connect Claude Desktop to the live database — no local server needed. Ask things like:
+Query the database in natural language from Claude Desktop. Ask things like:
 - *"Are there common ALU insertions near BRCA2 in African populations?"*
 - *"How many LINE1 insertions are intronic vs. intergenic?"*
 - *"What's the population frequency breakdown for insertion A0012345?"*
@@ -67,13 +84,15 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "dbrip": {
       "command": "npx",
-      "args": ["mcp-remote", "https://dbrip-mcp.onrender.com/mcp"]
+      "args": ["mcp-remote", "http://localhost:3001/mcp"]
     }
   }
 }
 ```
 
 `npx mcp-remote` is a stdio-to-HTTP bridge that Claude Desktop requires; it's auto-installed on first run. Restart Claude Desktop after saving the config.
+
+The MCP server must be running locally (`cd mcp && npm start`) — or replace `localhost:3001` with the hosted MCP URL (`https://dbrip-mcp.onrender.com/mcp`) to skip local setup.
 
 **Tools available to Claude:**
 
