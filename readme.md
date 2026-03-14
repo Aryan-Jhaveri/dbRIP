@@ -1,28 +1,37 @@
 # dbRIP API
 
-Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project. Provided as a web app, REST API, command-line tool, and Claude MCP connector.
+Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project.
 
 Hosted at: https://dbrip-api.onrender.com/
 
 ---
 
-## CLI — query the database from your terminal
+## Components
 
-Most lab members only need this. Install the CLI directly from GitHub — no cloning required:
+The project ships as four independent components. Install only what you need:
+
+| Component | What it is | How to get it |
+|-----------|-----------|---------------|
+| **CLI** | `dbrip` terminal tool — search, export, stats | `pip install "dbrip-api[cli] @ git+..."` |
+| **MCP** | Claude connector — query the DB in natural language | Claude Desktop config (no install) |
+| **API** | FastAPI backend + REST endpoints | `pip install "dbrip-api[api] @ git+..."` |
+| **Frontend** | React web app (6 tabs, IGV viewer) | Served by the API; built into the Docker image |
+| **Full stack** | Everything above, one container | `docker run` or Render blueprint |
+
+All components talk to the same hosted API at `https://dbrip-api.onrender.com/v1`. The CLI and MCP work out of the box against the hosted server — no local setup needed.
+
+---
+
+## CLI
+
+Most lab members only need this. Install directly from GitHub — no cloning required:
 
 ```bash
 pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"
-```
-
-This installs the `dbrip` command and its two dependencies (`typer`, `httpx`). Nothing else from the repo is installed.
-
-Then tell it where the hosted server is:
-
-```bash
 export DBRIP_API_URL=https://dbrip-api.onrender.com
 ```
 
-You can add that line to your `~/.bashrc` or `~/.zshrc` so you don't have to set it every session.
+Add the `export` line to `~/.bashrc` or `~/.zshrc` to make it permanent.
 
 ```bash
 # Search by region and TE type
@@ -44,27 +53,27 @@ Add `--output json` to any command for pipe-friendly JSON instead of a table.
 
 ---
 
-## Claude MCP Connector
+## MCP (Claude connector)
 
-Connect Claude to the live database so it can answer questions with real data. Ask things like:
+Connect Claude Desktop to the live database — no local server needed. Ask things like:
 - *"Are there common ALU insertions near BRCA2 in African populations?"*
 - *"How many LINE1 insertions are intronic vs. intergenic?"*
 - *"What's the population frequency breakdown for insertion A0012345?"*
 
-**Setup for Claude Desktop** — add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+Add this to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "dbrip": {
       "command": "npx",
-      "args": ["mcp-remote", "http://localhost:3001/mcp"]
+      "args": ["mcp-remote", "https://dbrip-mcp.onrender.com/mcp"]
     }
   }
 }
 ```
 
-`npx mcp-remote` acts as a stdio-to-HTTP bridge (Claude Desktop requires stdio; it's auto-installed on first run). The MCP server must be running locally — see the Development section below.
+`npx mcp-remote` is a stdio-to-HTTP bridge that Claude Desktop requires; it's auto-installed on first run. Restart Claude Desktop after saving the config.
 
 **Tools available to Claude:**
 
@@ -80,7 +89,7 @@ Connect Claude to the live database so it can answer questions with real data. A
 
 ## Web App
 
-Served from the same URL as the API. Six tabs:
+Served at the same URL as the API. Six tabs:
 
 - **Interactive Search** — search and filter all insertions, expand rows for population frequencies, copy selected rows as TSV, view in IGV
 - **File Search** — upload a BED/CSV/TSV and find overlapping insertions within a configurable window
@@ -91,9 +100,9 @@ Served from the same URL as the API. Six tabs:
 
 ---
 
-## Self-hosting
+## Self-hosting (full stack)
 
-The simplest path is Docker:
+Run everything locally with Docker:
 
 ```bash
 git clone https://github.com/Aryan-Jhaveri/dbRIP.git
@@ -104,7 +113,7 @@ docker run -p 8000:8000 dbrip-api
 
 Open `http://localhost:8000`. The image builds the frontend, loads the database, and starts the server in one step.
 
-For cloud hosting, connect the repo to [Render](https://render.com) — it will detect the `render.yaml` and configure everything automatically. Every push to `main` triggers a redeploy.
+For cloud hosting, connect the repo to [Render](https://render.com) → New → Blueprint. It detects `render.yaml` and creates both services (`dbrip-api` + `dbrip-mcp`) automatically.
 
 ---
 
@@ -117,17 +126,19 @@ Requires Python 3.11+ and Node.js 22+.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[all,dev]"
 python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
-uvicorn app.main:app --reload   # → http://localhost:8000/docs
+uvicorn app.main:app --reload          # → http://localhost:8000/docs
 
 # Frontend (separate terminal)
 cd frontend && npm install && npm run dev   # → http://localhost:5173
 
-# MCP server (separate terminal, requires Node 22+)
-cd mcp && npm install && npm start          # → http://localhost:3001/mcp
+# MCP server (separate terminal)
+cd mcp && npm install && npm start         # → http://localhost:3001/mcp
 
 # Tests
 pytest tests/ -v
 ```
+
+For local Claude Desktop testing, point the MCP config at `http://localhost:3001/mcp` instead of the hosted URL.
 
 ### Project structure
 
@@ -138,10 +149,10 @@ data/manifests/dbrip_v1.yaml   ← describes the CSV format for the ingest pipel
 ingest/                         ← ETL pipeline (BaseLoader + dbRIP-specific loader)
 scripts/ingest.py               ← CLI to load CSV into SQLite
 
-app/                            ← FastAPI (read-only, 7 endpoints)
-cli/dbrip.py                    ← `dbrip` CLI (Typer + httpx)
-frontend/src/                   ← React app (Vite + TanStack + Tailwind + igv.js)
-mcp/                            ← MCP server (Express + @modelcontextprotocol/sdk, 5 tools)
+app/                            ← FastAPI backend (read-only, 7 endpoints)
+cli/dbrip.py                    ← CLI pack (Typer + httpx, talks to hosted API)
+frontend/src/                   ← Frontend pack (Vite + React + TanStack + Tailwind + igv.js)
+mcp/                            ← MCP pack (Express + @modelcontextprotocol/sdk, 5 tools)
 tests/                          ← pytest suite (60 tests)
 ```
 

@@ -2,47 +2,89 @@
 # render.yaml — Render.com deploy configuration
 # ──────────────────────────────────────────────────────────────────────────────
 #
-# Render is a hosting platform that can deploy Docker containers directly from
-# a GitHub repository. When you push to the main branch, Render automatically
-# rebuilds the image and redeploys — zero manual steps.
+# This file defines two services that together make up the hosted dbRIP stack:
+#
+#   dbrip-api  (Python / Docker)   → https://dbrip-api.onrender.com
+#   dbrip-mcp  (Node.js)           → https://dbrip-mcp.onrender.com
+#
+# COMPONENT WIRING:
+#
+#   [browser / curl / dbrip CLI]
+#          │
+#          ▼
+#   dbrip-api  ── serves frontend (React, built into static files)
+#              ── exposes REST API at /v1/*
+#              ── exposes docs at /docs
+#          ▲
+#          │  HTTP (DBRIP_API_URL)
+#   dbrip-mcp  ── exposes MCP endpoint at /mcp
+#          ▲
+#          │  mcp-remote stdio bridge
+#   Claude Desktop / Claude.ai
+#
+# The MCP server has no database of its own — it is a thin HTTP proxy that
+# translates Claude's tool calls into GET requests against the FastAPI backend.
+# dbrip-mcp MUST have DBRIP_API_URL set to the live dbrip-api URL.
 #
 # HOW TO DEPLOY:
 #   1. Push this repo to GitHub
-#   2. Go to https://render.com → New → Web Service
-#   3. Connect your GitHub repo
-#   4. Render detects this file and pre-fills the settings
-#   5. Click "Create Web Service"
+#   2. Go to https://render.com → New → Blueprint
+#   3. Connect your GitHub repo — Render detects this file and creates both services
+#   4. Click "Apply"
 #
-# The free plan has enough resources for the dbRIP API (read-only SQLite, low traffic).
-# Note: free services spin down after 15 minutes of inactivity; the first request
-# after a cold start may take ~30 seconds while the container wakes up.
+# Free plan note: services spin down after 15 minutes of inactivity; the first
+# request after a cold start may take ~30 seconds while the container wakes up.
+#
+# NOTE: Render has no native paths-ignore support in render.yaml.
+# To skip a rebuild for a doc-only push, add [skip render] to the commit message
+# or configure ignored files in the Render dashboard → service Settings → "Ignored Files".
 # ──────────────────────────────────────────────────────────────────────────────
 
 services:
+
+  # ── Service 1: FastAPI backend + React frontend ───────────────────────────
+  #
+  # Built from the Dockerfile in the repo root. The Dockerfile:
+  #   - Stage 1: builds the React frontend (npm run build → static files)
+  #   - Stage 2: installs Python deps, copies static files, runs ingest, starts uvicorn
+  #
+  # Serves:
+  #   /        → React SPA (static files mounted by FastAPI StaticFiles)
+  #   /v1/*    → REST API endpoints
+  #   /docs    → Swagger UI
+  #   /health  → {"status": "ok"}
   - type: web
     name: dbrip-api
-
-    # Build from the Dockerfile in the repo root
     runtime: docker
     dockerfilePath: ./Dockerfile
-
-    # Render injects PORT automatically; our Dockerfile already uses 8000
-    # but Render routes external traffic to whichever port the app binds on.
-    # We bind to 0.0.0.0:8000 in the CMD, so no override needed.
-
-    # Free tier — upgrade to "starter" ($7/month) for always-on, more RAM
     plan: free
-
-    # Render uses this to confirm the service started successfully.
-    # /v1/health returns {"status": "ok"} immediately.
+    branch: main
     healthCheckPath: /v1/health
 
-    # Build is triggered automatically on every push to the main branch.
-    # Change to a specific branch name if you want to deploy from a different branch.
+  # ── Service 2: MCP server ─────────────────────────────────────────────────
+  #
+  # Thin Node.js HTTP server (mcp/) that wraps the FastAPI backend as an MCP
+  # tool server. Claude Desktop connects via mcp-remote (stdio→HTTP bridge).
+  #
+  # Serves:
+  #   POST /mcp    → MCP JSON-RPC endpoint (tools: list_datasets, get_stats,
+  #                  list_insertions, search_by_region, get_insertion)
+  #   GET  /health → {"status": "ok"}
+  #
+  # DBRIP_API_URL must point to the live dbrip-api service so tool calls
+  # reach the actual database. Do not point this at localhost.
+  #
+  # Port note: Render injects PORT; server.ts reads MCP_PORT. The start command
+  # passes Render's PORT through as MCP_PORT so the server binds correctly.
+  - type: web
+    name: dbrip-mcp
+    runtime: node
+    rootDir: mcp
+    buildCommand: npm install
+    startCommand: MCP_PORT=$PORT npm start
+    plan: free
     branch: main
-
-    # NOTE: Render has no native paths-ignore support in render.yaml.
-    # To skip a Render rebuild for a doc-only push, either:
-    #   - Add [skip render] to the commit message, OR
-    #   - Set ignored files in the Render dashboard → service Settings → "Ignored Files"
-    #     (e.g. README.md, IMPLEMENTATIONS.md, docs/**, NOTEBOOK/**).
+    healthCheckPath: /health
+    envVars:
+      - key: DBRIP_API_URL
+        value: https://dbrip-api.onrender.com/v1
