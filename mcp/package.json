@@ -1,0 +1,24 @@
+{
+  "name": "dbrip-mcp",
+  "version": "0.1.0",
+  "description": "Remote MCP connector for the dbRIP TE insertion database",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev":       "node --experimental-strip-types server.ts",
+    "build":     "tsc --noEmit",
+    "start":     "node --experimental-strip-types server.ts",
+    "typecheck": "tsc --noEmit",
+    "inspect":   "npx @modelcontextprotocol/inspector"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.15.1",
+    "express": "^5.1.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^24.0.0",
+    "@types/express": "^5.0.3"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    // "ES2022" gives us top-level await, class fields, and other modern JS features.
+    // Node 18+ understands ES2022 natively, so compiled output needs no polyfills.
+    "target": "ES2022",
+
+    // "NodeNext" is required for two reasons:
+    //   1. ESM support — enables import/export syntax in Node.js
+    //   2. The MCP SDK uses package.json "exports" fields to map subpaths like
+    //      "@modelcontextprotocol/sdk/server/mcp.js". NodeNext module resolution
+    //      understands these exports fields; the older "node" mode does not.
+    // IMPORTANT: With NodeNext, local imports MUST use .ts extensions in source
+    //   files (e.g., import { foo } from "./tools/insertions.ts"), NOT .js.
+    //   Node --experimental-strip-types and tsc both handle this correctly.
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    // "outDir" is where tsc puts compiled JavaScript. Used by "npm run build"
+    // and "npm run start" for production deployment.
+    "outDir": "dist",
+
+    // "rootDir" tells tsc where source files start (relative to tsconfig.json).
+    // Must match "include" paths below.
+    "rootDir": ".",
+
+    // Strict mode catches common bugs: implicit any, null dereference, etc.
+    // All type errors must be fixed before the build succeeds.
+    "strict": true,
+
+    // Skip type-checking of .d.ts files inside node_modules. Some packages
+    // have declaration files that don't perfectly typecheck — this avoids
+    // failures caused by third-party types we don't control.
+    "skipLibCheck": true,
+
+    // Report errors for locally declared variables/imports that are never used.
+    // Helps keep code clean; unused imports are almost always mistakes.
+    "noUnusedLocals": true,
+
+    // Required because source files use .ts extensions in import paths
+    // (e.g., import from "./tools/insertions.ts"). This is necessary because
+    // node --experimental-strip-types resolves imports literally — it looks
+    // for the actual .ts file, not a .js→.ts substitution.
+    //
+    // TRADEOFF: allowImportingTsExtensions requires noEmit (TypeScript cannot
+    // emit .js files that contain .ts import paths, since they'd fail at runtime).
+    // Production deployment therefore runs the TypeScript source directly using
+    // node --experimental-strip-types (Node 22+) rather than compiled JS.
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+
+    // NOTE: Unlike frontend/tsconfig.app.json, this file does NOT have:
+    //   "lib": ["DOM"]  — we use Node globals (fetch, URLSearchParams) from @types/node
+    //   "jsx": ...      — no React in the MCP server
+  },
+
+  // Only compile these files. The tools/ glob picks up all tool files
+  // without needing to list them individually.
+  "include": ["server.ts", "tools/**/*.ts"]
+}

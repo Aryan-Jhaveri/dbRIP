@@ -24,6 +24,11 @@ NOTEBOOK/
 # Environment
 .env
 
+.DS_Store
+
+# MCP server
+mcp/node_modules/
+mcp/dist/
 
 ## CLAUDE
 CLAUDE.md

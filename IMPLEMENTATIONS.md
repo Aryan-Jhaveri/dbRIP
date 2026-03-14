@@ -1,333 +1,124 @@
-# Next Steps — What to Build on Top of the API
+# What's Built / What's Next
 
-The core API is working: ingest pipeline, database, 7 endpoints, 60 tests (13 ingest + 26 API + 21 CLI).
-Below are the next things to build, roughly in priority order.
+## What's built
 
-
-## Pending
-
-- [ ] **Pop-freq filters** — Interactive Search and Batch Search have no filters for the
-  `pop_freq` table (filter insertions by population sample frequency). Need dropdowns in
-  both tabs for selecting a population and a minimum frequency threshold.
-
-- [ ] **Column header sort + filter dropdowns** — column headers in the data table should
-  support click-to-sort and inline filter dropdowns (e.g., filter ME Type to just `ALU`
-  directly from the column header).
-
-- [ ] **Export enums** — add `FastAPI Enum` / `Literal` types to the export endpoint so
-  `?format=` is restricted to `bed | vcf | csv` at the API level, not just in docs.
-
-- [ ] **Strand enums** — consider:
-  ```python
-  class Strand(str, Enum):
-      plus = "+"
-      minus = "-"
-
-  raw_strand = Strand.plus.value  # Returns "+"
-  ```
-  May be necessary if strand values in the CSV are inconsistent across rows.
-
-- [ ] **Error handling docs** — document default fallback behavior for query parameters.
-  If a caller omits `?` or provides no parameters, what does each endpoint return?
-  Add clear docstrings and OpenAPI descriptions for each parameter's default.
-
-
-## Done
-
-- ✅ **Interactive search and filtering** — server-side `LIKE` across 8 columns with debounce.
-  Fixed-value filters (ME Type, Category, Annotation) use `<select multiple>` → SQL `IN` clause.
-  Population + min_freq filters wire directly to the API. No empty-page bug.
-
-- ✅ **Row count description** — "Showing X to Y of Z entries" is dynamically computed from
-  API `total`.
-
-- ✅ **Row selection** — row-click highlights blue (`bg-blue-200`); shift+click for range;
-  drag-to-select (hold and sweep) with auto select/deselect mode. Selected rows feed the
-  "Copy N selected rows" button which fetches full detail (including pop freqs) and writes
-  TSV to clipboard.
-
-- ✅ **Jump to page** — "Go to:" input on the pagination bar.
-
-- ✅ **MkDocs tab** — the frontend's Docs tab renders all four MkDocs pages
-  (index, api-reference, cli, biology) fetched from the API.
-
-- ✅ **File Search** — BED/CSV/TSV file upload, configurable window size, overlap query,
-  and results table with download.
-
-- ✅ **Pop freq inline expand** — population frequencies shown as a nested row below each
-  data row when the user checks that row's checkbox. Header checkbox expands/collapses all
-  rows on the current page. TanStack Query caches fetched detail by ID.
+| Layer | Status |
+|-------|--------|
+| Ingest pipeline (CSV → SQLite) | Done |
+| FastAPI backend (7 endpoints, 39 tests) | Done |
+| CLI (`dbrip` — 5 commands, 21 tests) | Done |
+| MkDocs documentation site | Done |
+| React frontend (6 tabs: Interactive Search, File Search, Batch Search, IGV Viewer, API Reference, CLI Reference) | Done |
+| Docker + Render deployment | Done |
+| MCP server (`mcp/` — 5 tools, HTTP transport, `mcp-remote` bridge for Claude Desktop) | Done |
 
 ---
 
-## 1. MCP Server — Let Claude Query the Database
+## Pending
 
-**What:** An [MCP server](https://modelcontextprotocol.io/) that wraps the API so Claude can query
-the database in natural language during a conversation.
+### 1. Deploy the MCP server publicly
 
-**Why:** A researcher could ask Claude "Are there common Alu insertions near
-BRCA2 in Africans?" and Claude would automatically call the API, get real data,
-and answer with actual numbers.
+**What:** The MCP server in `mcp/` runs locally today. Deploying it to a public URL turns the Claude MCP connector from a local-dev feature into something any lab member can use by pointing Claude Desktop at a URL.
 
-**Where:** `mcp/server.py`
+**How:** Deploy `mcp/` as a separate service on Render alongside the FastAPI backend. Set `DBRIP_API_URL` to the hosted API URL.
 
-**How it would work:**
-```python
-from mcp.server.fastmcp import FastMCP
-import httpx
-
-mcp = FastMCP("dbRIP")
-BASE = "http://localhost:8000/v1"
-
-@mcp.tool()
-def search_insertions(chrom: str, start: int, end: int,
-                      me_type: str | None = None,
-                      population: str | None = None,
-                      min_freq: float | None = None) -> list[dict]:
-    """Search TE insertions in a genomic region with optional filters."""
-    params = {k: v for k, v in locals().items() if v is not None}
-    r = httpx.get(f"{BASE}/insertions/region/hg38/{chrom}:{start}-{end}", params=params)
-    return r.json()["results"]
-
-@mcp.tool()
-def get_insertion(id: str) -> dict:
-    """Get full details for a single insertion by ID."""
-    return httpx.get(f"{BASE}/insertions/{id}").json()
-
-@mcp.tool()
-def get_stats(by: str = "me_type") -> dict:
-    """Summary stats grouped by me_type, population, chrom, or variant_class."""
-    return httpx.get(f"{BASE}/stats", params={"by": by}).json()
-```
-
-**Dependencies:** `pip install mcp httpx`
-
-**To register with Claude Desktop:** Add to `claude_desktop_config.json`:
+**Config after deployment** (replaces the localhost config in README):
 ```json
 {
   "mcpServers": {
     "dbrip": {
-      "command": "python",
-      "args": ["mcp/server.py"],
-      "cwd": "/path/to/dbRIP-API"
+      "command": "npx",
+      "args": ["mcp-remote", "https://dbrip-mcp.onrender.com/mcp"]
     }
   }
 }
 ```
 
-**Effort:** Small — the API already does the heavy lifting, the MCP server just wraps it.
+**Effort:** Small — `mcp/` already has a `package.json` start script. Add a `render.yaml` service entry.
 
 ---
 
-## 2. CLI Tool — DONE
+### 2. Column sort + filter dropdowns in DataTable
 
-**Status:** Complete. 5 commands (`search`, `get`, `export`, `stats`, `datasets`), 21 tests.
+**What:** Clicking a column header sorts by that column (asc/desc toggle). Each column header also has a small dropdown to filter to a specific value (e.g. click ME Type header → dropdown showing ALU / LINE1 / SVA / HERVK / PP).
 
-**Files:** `cli/__init__.py`, `cli/dbrip.py`, `tests/test_cli.py`
+**Where:** `frontend/src/components/DataTable.tsx` + `frontend/src/pages/InteractiveSearch.tsx`
 
-**Stack:** Typer + httpx. Thin HTTP wrapper — talks to the running API, no direct DB access.
+**How:** TanStack Table has built-in sorting state (`getSortedRowModel`) and column filter state (`getFilteredRowModel`). The sort state would be lifted to the parent and sent as query params to the API so sorting is server-side (same as search). Column filter dropdowns use `<select>` with the existing constants from `frontend/src/constants/filters.ts`.
 
-**Features:**
-- Region shorthand: `chr1:1M-5M` → `chr1:1000000-5000000`
-- Output modes: `--output table` (rich tables) or `--output json` (pipe-friendly)
-- Export to stdout or file: `dbrip export --format bed -o out.bed`
-- Config via `DBRIP_API_URL` env var (default: `http://localhost:8000`)
-
-**Usage:**
-```bash
-dbrip search --region chr1:1M-5M --me-type ALU
-dbrip get A0000001
-dbrip export --format vcf --me-type LINE1 -o l1.vcf
-dbrip stats --by me_type
-dbrip export --format bed | bedtools intersect -a - -b peaks.bed
-```
+**Effort:** Medium — needs API-side `sort_by` / `sort_order` params wired through the ORM query.
 
 ---
 
-## 3. Documentation Site — DONE
+### 3. Manifest-driven frontend
 
-**Status:** Complete. MkDocs Material site with 4 pages.
+**What:** Right now the frontend's table columns, filter dropdowns, and export fields are hardcoded TypeScript. When a second dataset with different columns is loaded, a developer has to update both the API models and the frontend components.
 
-**Files:** `mkdocs.yml`, `docs/index.md`, `docs/api-reference.md`, `docs/cli.md`, `docs/biology.md`
-
-**What's covered:**
-- `index.md` — landing page, links to README for setup
-- `api-reference.md` — all endpoints with curl examples and sample JSON responses
-- `cli.md` — full CLI usage with piping/scripting examples
-- `biology.md` — TE families, populations, variant classes, coordinates (for new lab members)
-
-**Built-in docs also available:**
-- `/docs` — Swagger UI (interactive)
-- `/redoc` — ReDoc (read-only)
-
-**To serve locally:** `pip install mkdocs-material && mkdocs serve`
-
----
-
-## 4. Web Frontend — DONE (core)
-
-**Status:** Core complete. Vite + React + TypeScript + TanStack Table/Query + Tailwind.
-
-**Files:** `frontend/src/`
-
-**Features shipped:**
-- Interactive Search: server-side search + 6 filter types + pagination + "Go to page" + Download CSV + Copy selected rows (TSV with pop freqs) + drag-to-select rows + inline pop freq expand via checkbox + "View in IGV" button (single-row selection)
-- File Search: BED/CSV/TSV upload + window overlap + results table + download
-- Batch Search: checkbox filters (ME type, category, annotation, strand, chrom) + download
-- IGV Viewer: igv.js embedded browser — genome selector (hg38/hg19), locus navigation, local file upload (BAM+BAI, BED, VCF), active track list with remove buttons; stays mounted across tab switches to preserve loaded tracks; navigated automatically from InteractiveSearch "View in IGV"
-- API Reference tab: renders MkDocs `api-reference.md` fetched from the API
-- CLI Reference tab: quick-reference for all `dbrip` commands
-- `DataTable` component: generic, reusable, two independent interaction systems (row-click = copy selection; checkbox = inline expand)
-
-**Stack:** `frontend/` — `npm run dev` for local, `npx tsc --noEmit` to type-check.
-
-**Remaining frontend work:**
-- Column header sort + filter dropdowns
-- Pop-freq filters in Interactive Search and Batch Search
-- Docker + FastAPI `StaticFiles` mount for single-process deployment
-
----
-
-## 5. Docker Deployment
-
-**What:** Containerize the API for deployment on a server, cloud, or shared lab machine.
-
-**Files:** `Dockerfile` + `docker-compose.yml` (already skeleton files in the repo)
-
-**Architecture:**
-```
-docker-compose.yml
-├── db         (postgres:16-alpine)     ← production database
-├── api        (FastAPI + uvicorn)      ← the API server
-└── migrate    (alembic upgrade head)   ← runs once on startup
-```
-
-**For SQLite-only deployment** (simpler, no PostgreSQL):
-```dockerfile
-FROM python:3.13-slim
-COPY . /app
-WORKDIR /app
-RUN pip install .
-# Pre-load the data
-RUN python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
-
-**Effort:** Small for SQLite-only, medium for full PostgreSQL + Alembic setup.
-
----
-
-## 6. IGV Viewer (igv.js) — DONE
-
-**Status:** Complete. Embedded igv.js browser as the 4th tab ("IGV Viewer") in the frontend.
-
-**Files:**
-- `frontend/src/pages/IgvViewer.tsx` — main page component (browser lifecycle, track upload UI)
-- `frontend/src/types/igv.d.ts` — TypeScript ambient module declaration (igv.js has no bundled types)
-- `frontend/src/App.tsx` — adds "igv" tab, `igvLocus` state, `handleViewInIgv` callback
-- `frontend/src/pages/InteractiveSearch.tsx` — "View in IGV" button when exactly 1 row is selected
-
-**Features:**
-- Reference genome selector: GRCh38/hg38 (default, matches dbRIP) or GRCh37/hg19
-- Locus navigation: coordinate input (`chr3:100,234,500-100,235,000`) or gene name (`BRCA1`)
-- File upload tracks: BAM (requires .bai index), BED (no index needed), VCF (no index needed)
-- Active tracks list with per-track Remove button
-- "View in IGV" button in InteractiveSearch action bar (appears when exactly 1 row is row-click selected) — switches to IGV tab and navigates to insertion locus
-- IgvViewer stays mounted via `display:none` (not conditionally rendered) so loaded tracks persist when switching tabs
-
-**Key implementation notes:**
-- React StrictMode double-init guard: `if (browserRef.current !== null) return` in the init `useEffect`
-- Async race flag: `cancelled` boolean prevents assigning a browser instance to an unmounted component
-- `igv.removeBrowser(browser)` called in effect cleanup to release DOM nodes and event listeners
-- TypeScript shim (`igv.d.ts`) declares only the subset of the API actually used
-
----
-
-## 7. Manifest-Driven Frontend
-
-**Goal:** If the CSV gains new columns (new annotation types, CHM13 coordinates, multi-assembly
-support), only the YAML manifest should need to change — the frontend adapts automatically.
-
-**Why this matters:** Right now, the frontend's table columns, filter dropdowns, and export fields
-are hardcoded in TypeScript. Every time the lab adds a new dataset with different columns, a
-developer has to update both the API models and the frontend components separately. This creates
-frontend drift — the UI silently shows fewer columns than the API provides.
-
-**How it would work:**
-1. Add a `GET /v1/schema` endpoint that reads the loaded manifest and returns column names and types:
+**How:**
+1. Add `GET /v1/schema` — reads the loaded manifest and returns column names, types, and enum values:
    ```json
    {
      "columns": [
-       { "name": "id",      "type": "string",  "filterable": false },
-       { "name": "chrom",   "type": "string",  "filterable": true  },
-       { "name": "me_type", "type": "enum",    "values": ["ALU", "LINE1", "SVA"] },
+       { "name": "me_type", "type": "enum", "values": ["ALU", "LINE1", "SVA", "HERVK", "PP"] },
+       { "name": "chrom",   "type": "string", "filterable": true },
        { "name": "start",   "type": "integer", "filterable": false }
      ]
    }
    ```
-2. The frontend calls `GET /v1/schema` at startup via TanStack Query and builds its table columns,
-   filter dropdowns, and export fields from that response instead of hardcoded TypeScript arrays.
-3. When a new dataset with new columns is loaded, the frontend automatically shows the new columns
-   and offers the new filter values — no TypeScript changes required.
+2. Frontend calls `GET /v1/schema` at startup via TanStack Query and builds its table columns + filter dropdowns from that response.
 
-**When to build:** After the first time a second dataset is loaded (e.g., euL1db). Until then,
-the current hardcoded approach is simpler and less error-prone.
+**When:** After the first second dataset is loaded. Until then the hardcoded approach is simpler.
+
+**Effort:** Medium.
 
 ---
 
-## 8. Additional Datasets
+### 4. Additional datasets
 
-**What:** Load other TE databases alongside dbRIP.
+**What:** Load other TE databases alongside dbRIP into the same SQLite instance.
 
 **How:** The manifest + loader pattern makes this straightforward:
-1. Drop the new CSV in `data/raw/`
-2. Write a new manifest YAML in `data/manifests/`
-3. Write a new loader class (inherits from `BaseLoader`)
+1. Drop the CSV in `data/raw/`
+2. Write a manifest YAML in `data/manifests/`
+3. Write a loader class inheriting `BaseLoader` in `ingest/`
 4. Run `python scripts/ingest.py --manifest data/manifests/new_dataset.yaml`
 
-**Potential datasets:**
-- [euL1db](https://www.euL1db.icm.unicamp.br/) — LINE1 insertions in humans
-- [TEMPOseq](https://github.com/WashU-BRG/TEMPOseq) — TE expression data
+Each dataset gets its own `dataset_id`; queries can filter by source with `?dataset_id=eul1db_v1`.
+
+**Candidates:**
+- [euL1db](https://www.euL1db.icm.unicamp.br/) — curated LINE1 insertions in the human genome
 - Custom lab datasets
 
-**Each dataset gets its own `dataset_id`**, so queries can filter by source:
-`/v1/insertions?dataset_id=eul1db_v1`
+**Effort:** Small per dataset once the manifest format is understood; the loader pattern handles normalization.
 
 ---
 
-## 9. Enrichment / Annotation Extensions
+### 5. Enrichment / annotation extensions
 
-**What:** Add biological context to insertions — gene names, OMIM disease links.
+**What:** Add biological context to each insertion — nearest gene name, OMIM disease links, GTEx eGene associations.
 
-**Where:** Extension tables in the database (already sketched in the API design doc):
+**Where:** New `enrichment` table in the database:
 ```sql
 CREATE TABLE enrichment (
     insertion_id  TEXT PRIMARY KEY REFERENCES insertions(id),
     gene_name     TEXT,
     gene_id       TEXT,
-    evo2_score    REAL,
-    omim_ids      TEXT[],
+    omim_ids      TEXT,   -- comma-separated
     gtex_egene    TEXT
 );
 ```
 
-**How:** A new ingest script (e.g. `scripts/enrich.py`) that:
-1. Reads insertions from the DB
-2. Looks up each position in a gene annotation file (GTF)
-3. Cross-references with OMIM, GTEx, etc.
-4. Writes to the `enrichment` table
+**How:** A new script `scripts/enrich.py` that reads insertions from the DB, looks up each position against a GTF annotation file, cross-references with OMIM / GTEx, and writes to `enrichment`. New endpoint: `GET /v1/insertions/{id}/enrichment`.
 
-**New endpoint:** `GET /v1/insertions/{id}/enrichment`
-
-**Effort:** Large — requires downloading and parsing external data sources.
+**Effort:** Large — requires downloading and parsing external data sources (Ensembl GTF, OMIM, GTEx).
 
 ---
 
-## 10. Liftover (hg19 / CHM13 coordinates)
+### 6. Liftover (hg19 / CHM13 coordinates)
 
-**What:** Provide alternate coordinates for each insertion in hg19 and CHM13 assemblies.
+**What:** Alternate coordinates for each insertion in hg19 and CHM13 so users working in other assemblies can still query by position.
 
-**Where:** `coordinates_liftover` table (already sketched in the design doc):
+**Where:** New `coordinates_liftover` table:
 ```sql
 CREATE TABLE coordinates_liftover (
     insertion_id  TEXT REFERENCES insertions(id),
@@ -335,34 +126,24 @@ CREATE TABLE coordinates_liftover (
     chrom         TEXT,
     start         INTEGER,
     end           INTEGER,
-    method        TEXT,    -- "UCSC liftOver" or "T2T tools"
+    method        TEXT,    -- "UCSC liftOver"
     UNIQUE (insertion_id, assembly)
 );
 ```
 
-**How:** Use UCSC `liftOver` tool with chain files. A script would:
-1. Export insertions as BED (using the API's export endpoint)
-2. Run `liftOver` to convert hg38 → hg19 and hg38 → CHM13
-3. Load the results into the `coordinates_liftover` table
+**How:** Script exports insertions as BED → runs UCSC `liftOver` with the relevant chain files → loads lifted coordinates back into the DB. Region queries would then accept `?assembly=hg19` and use the lifted coordinates automatically.
 
-**New endpoint:** Region queries would accept `assembly=hg19` and automatically use the
-lifted coordinates.
-
-**Effort:** Medium — the tool exists, the challenge is handling unmapped regions.
+**Effort:** Medium — the `liftOver` tool exists; the challenge is handling insertions that don't map cleanly.
 
 ---
 
-## Suggested Priority
+## Priority order
 
-| Priority | What | Status | Why |
-|----------|------|--------|-----|
-| 1 | Docker (SQLite-only) | Pending | Makes it deployable immediately |
-| 2 | MCP Server | Pending | High-value, low-effort — Claude can query real data |
-| 3 | CLI tool | Done — 5 commands, 21 tests | — |
-| 4 | Web frontend | Done — core features shipped | — |
-| 5 | IGV Viewer (igv.js) | Done | Embedded browser + file upload + cross-tab navigation from InteractiveSearch |
-| 6 | Manifest-Driven Frontend | Pending (after 2nd dataset) | Future-proofs UI against schema changes |
-| 7 | Additional datasets | Pending | Multiplies the value of everything above |
-| 8 | Enrichment | Pending | High scientific value but requires external data work |
-| 9 | Liftover | Pending | Important for cross-assembly analysis |
-| 10 | PostgreSQL + Alembic | Pending | Only needed when scale demands it |
+| # | What | Effort |
+|---|------|--------|
+| 1 | Deploy MCP server publicly | Small |
+| 2 | Column sort + filter dropdowns | Medium |
+| 3 | Additional datasets (euL1db) | Small per dataset |
+| 4 | Manifest-driven frontend | Medium (after 2nd dataset) |
+| 5 | Enrichment / annotations | Large |
+| 6 | Liftover (hg19/CHM13) | Medium |
