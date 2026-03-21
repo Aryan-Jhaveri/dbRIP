@@ -1,6 +1,13 @@
 # dbRIP API
 
-Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project.
+The [dbRIP database](https://lianglab.shinyapps.io/shinydbRIP/) (Liang Lab, Brock University) currently catalogs 44,984 transposable element insertion polymorphisms — positions in the human genome where a mobile element (ALU, LINE1, SVA, HERVK) is present in some people but absent in others. Each insertion carries allele frequencies across 33 populations from the 1000 Genomes Project (hg38).
+
+This repo turns that dataset into a queryable, self-updating system with direct UCSC Genome Browser integration:
+
+- **UCSC Genome Browser track hub** — A GitHub Actions workflow converts the database into indexed bigBed files (one per ME family) and deploys them to GitHub Pages. UCSC loads insertions as colored, searchable tracks, fetching only the visible region via HTTP byte-range — no data upload to UCSC, no manual rebuild step. Pushing a new CSV to `main` is all it takes to update the hub.
+- **Data updates are a single command** — The CSV in `data/raw/` is the source of truth; the database is always rebuildable from it. Adding a batch of new entries or correcting existing ones means dropping in an updated CSV and running `python scripts/ingest.py`. The API, frontend, and track hub all reflect the change after the next push to `main`.
+- **Multiple access modes** — Read-only REST API (JSON, BED6, VCF, CSV), a six-tab React web app with population frequency tables and bulk IGV/UCSC export, a `dbrip` CLI installable directly from GitHub, and a Claude MCP connector for natural-language queries.
+- **Fork-and-run deployment** — GitHub Pages hosts the frontend and track hub automatically on any fork. The one thing to configure: `API_BASE_URL` in `.github/workflows/build-trackhub.yml`, pointing at wherever the lab runs the FastAPI backend (lab server, cloud VM, or free-tier host).
 
 | Service | URL |
 |---------|-----|
