@@ -17,10 +17,10 @@
 #   {me_type_lower} — lowercase ME type used in the .bb filename, e.g. "alu"
 #   {assembly}      — genome assembly, e.g. "hg38"
 #   {hub_url}       — public base URL where hub files are hosted
-#   {color}         — RGB color string, e.g. "200,0,0"
-#                     assigned from a fixed color map in the script:
-#                       ALU=200,0,0  LINE1=0,0,180  SVA=0,150,0  HERVK=150,0,150
-#                     unknown ME types receive a gray fallback: 100,100,100
+#   {color}         — RGB color string from the Okabe-Ito colorblind-safe palette:
+#                       ALU=0,114,178  LINE1=213,94,0  SVA=0,158,115
+#                       HERVK=204,121,167  PP=230,159,0
+#                     unknown ME types receive a gray fallback: 150,150,150
 #
 # UCSC FORMAT RULES:
 #   - "parent dbRIP" links this sub-track to the composite track above

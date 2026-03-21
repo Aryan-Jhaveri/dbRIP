@@ -24,4 +24,4 @@ shortLabel dbRIP
 longLabel Database of Retrotransposon Insertion Polymorphisms (Liang Lab, Brock University)
 genomesFile genomes.txt
 email liang@brocku.ca
-descriptionUrl https://dbrip.org
+descriptionUrl https://lianglab.brocku.ca/

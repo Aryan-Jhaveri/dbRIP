@@ -92,14 +92,30 @@ TEMPLATES_DIR = PROJECT_ROOT / "data" / "hub" / "templates"
 
 # Color palette for UCSC track display.
 # Colors are RGB strings ("R,G,B") — the format UCSC's trackDb expects.
-# Any ME type not in this map gets the gray fallback.
+#
+# WHY OKABE-ITO?
+#   The original palette (red ALU, green SVA) failed for red-green colorblind
+#   users (~8% of males), who cannot distinguish those two tracks. The Okabe-Ito
+#   palette (Okabe & Ito 2008, "Color Universal Design") is the standard
+#   colorblind-safe palette in biology — it is distinguishable under deuteranopia,
+#   protanopia, and tritanopia. All five known ME types are now explicitly named
+#   so none fall through to the gray default.
+#
+# Palette assignments:
+#   ALU   (33,709 rows, 75%) — blue         0,114,178
+#   LINE1  (6,468 rows, 14%) — vermilion    213,94,0
+#   SVA    (4,697 rows, 10%) — bluish green 0,158,115
+#   HERVK    (101 rows, <1%) — reddish purple 204,121,167
+#   PP         (9 rows, <1%) — orange       230,159,0
+#   unknown future types     — gray         150,150,150
 ME_TYPE_COLORS: dict[str, str] = {
-    "ALU":   "200,0,0",    # red
-    "LINE1": "0,0,180",    # navy blue
-    "SVA":   "0,150,0",    # forest green
-    "HERVK": "150,0,150",  # purple
+    "ALU":   "0,114,178",    # blue          (Okabe-Ito)
+    "LINE1": "213,94,0",     # vermilion     (Okabe-Ito)
+    "SVA":   "0,158,115",    # bluish green  (Okabe-Ito)
+    "HERVK": "204,121,167",  # reddish purple (Okabe-Ito)
+    "PP":    "230,159,0",    # orange        (Okabe-Ito)
 }
-DEFAULT_COLOR = "100,100,100"  # gray — for any future ME type not listed above
+DEFAULT_COLOR = "150,150,150"  # gray — for any future ME type not listed above
 
 
 # ── Tool detection ────────────────────────────────────────────────────────

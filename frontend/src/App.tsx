@@ -103,8 +103,12 @@ export default function App() {
             dbRIP — Database of Retrotransposon Insertion Polymorphism
           </h1>
           <p className="mt-1 text-sm">
-            44,984 TE insertions across 33 populations (1000 Genomes, GRCh38).
-            For issues, contact: tl21xq@brocku.ca
+            44,984 TE insertions across 33 populations (1000 Genomes, GRCh38).{" "}
+            <a href="https://lianglab.brocku.ca/" target="_blank" rel="noreferrer"
+               className="underline hover:opacity-75">Liang Lab</a>
+            {" · "}
+            <a href="mailto:tl21xq@brocku.ca"
+               className="underline hover:opacity-75">tl21xq@brocku.ca</a>
           </p>
         </div>
 
