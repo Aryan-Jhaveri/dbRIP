@@ -236,6 +236,50 @@ class TestParseHg19Fasta:
 
 # ── Tests: write_bed_from_records ─────────────────────────────────────────
 
+class TestFilterInvalidBedRows:
+    """filter_invalid_bed_rows drops rows where end <= start."""
+
+    def test_keeps_valid_rows(self, tmp_path):
+        bed = tmp_path / "in.bed"
+        bed.write_text("chr1\t100\t200\tA001\t0\t+\n")
+        out = tmp_path / "out.bed"
+        dropped = bth.filter_invalid_bed_rows(bed, out)
+        assert dropped == 0
+        assert out.read_text().strip() == "chr1\t100\t200\tA001\t0\t+"
+
+    def test_drops_end_before_start(self, tmp_path):
+        bed = tmp_path / "in.bed"
+        bed.write_text(
+            "chr1\t200\t100\tBAD\t0\t+\n"   # end < start → drop
+            "chr1\t100\t200\tOK\t0\t+\n"
+        )
+        out = tmp_path / "out.bed"
+        dropped = bth.filter_invalid_bed_rows(bed, out)
+        assert dropped == 1
+        lines = out.read_text().strip().splitlines()
+        assert len(lines) == 1
+        assert "OK" in lines[0]
+
+    def test_drops_end_equals_start(self, tmp_path):
+        bed = tmp_path / "in.bed"
+        bed.write_text("chr1\t100\t100\tZERO_LEN\t0\t+\n")
+        out = tmp_path / "out.bed"
+        dropped = bth.filter_invalid_bed_rows(bed, out)
+        assert dropped == 1
+        assert out.read_text().strip() == ""
+
+    def test_returns_count_of_dropped(self, tmp_path):
+        bed = tmp_path / "in.bed"
+        bed.write_text(
+            "chr1\t500\t100\tBAD1\t0\t+\n"
+            "chr1\t300\t100\tBAD2\t0\t+\n"
+            "chr1\t100\t200\tOK\t0\t+\n"
+        )
+        out = tmp_path / "out.bed"
+        dropped = bth.filter_invalid_bed_rows(bed, out)
+        assert dropped == 2
+
+
 class TestWriteBedFromRecords:
     """write_bed_from_records writes a list of tuples to a BED6 file."""
 

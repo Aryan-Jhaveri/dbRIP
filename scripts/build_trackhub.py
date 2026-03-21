@@ -207,6 +207,37 @@ def fetch_bed_to_file(api_url: str, me_type: str, output_path: Path, timeout: in
 
 # ── BED → bigBed pipeline ─────────────────────────────────────────────────
 
+def filter_invalid_bed_rows(input_path: Path, output_path: Path) -> int:
+    """Remove BED rows where end <= start (invalid for bedToBigBed).
+
+    WHY THIS IS NEEDED:
+    Some insertions in the source CSV have start > end. The project's "no data
+    cleaning" rule means these are preserved in the database and API exports.
+    But bedToBigBed rejects any row where end <= start, so we filter them out
+    here and print a warning. The original data in the DB is not modified.
+
+    Returns the number of dropped rows.
+    """
+    dropped = 0
+    with open(input_path, encoding="utf-8") as f_in, \
+         open(output_path, "w", encoding="utf-8") as f_out:
+        for line in f_in:
+            if not line.strip():
+                continue
+            cols = line.split("\t")
+            if len(cols) >= 3:
+                try:
+                    start = int(cols[1])
+                    end = int(cols[2])
+                    if end <= start:
+                        dropped += 1
+                        continue
+                except ValueError:
+                    pass  # non-numeric — let bedToBigBed report its own error
+            f_out.write(line)
+    return dropped
+
+
 def sort_bed(input_path: Path, output_path: Path):
     """Sort a BED file by chromosome then start position.
 
@@ -634,9 +665,17 @@ def build_hg38(
                 print(f"    WARNING: no rows returned for {me_type} — skipping bigBed")
                 continue
 
+            # Step 1.5 — filter out invalid rows (end <= start)
+            # Some insertions in the source CSV have swapped start/end.
+            # The DB preserves them (no data cleaning rule), but bedToBigBed rejects them.
+            filtered_bed = tmp / f"{me_type}_filtered.bed"
+            n_invalid = filter_invalid_bed_rows(raw_bed, filtered_bed)
+            if n_invalid > 0:
+                print(f"    WARNING: {n_invalid} rows with end <= start (dropped for bigBed)")
+
             # Step 2 — sort
             sorted_bed = tmp / f"{me_type}_sorted.bed"
-            sort_bed(raw_bed, sorted_bed)
+            sort_bed(filtered_bed, sorted_bed)
 
             # Steps 3+4 — convert to bigBed
             bb_path = asm_dir / f"dbrip_{me_type.lower()}_{assembly}.bb"
@@ -709,9 +748,15 @@ def build_hg19(
             raw_bed = tmp / f"hg19_{me_type}_raw.bed"
             write_bed_from_records(records, raw_bed)
 
+            # Filter out invalid rows (end <= start)
+            filtered_bed = tmp / f"hg19_{me_type}_filtered.bed"
+            n_invalid = filter_invalid_bed_rows(raw_bed, filtered_bed)
+            if n_invalid > 0:
+                print(f"    WARNING: {n_invalid} rows with end <= start (dropped for bigBed)")
+
             # Sort and convert
             sorted_bed = tmp / f"hg19_{me_type}_sorted.bed"
-            sort_bed(raw_bed, sorted_bed)
+            sort_bed(filtered_bed, sorted_bed)
 
             bb_path = asm_dir / f"dbrip_{me_type.lower()}_{assembly}.bb"
             convert_to_bigbed(sorted_bed, chrom_sizes, bb_path)
