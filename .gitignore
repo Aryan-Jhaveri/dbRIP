@@ -39,3 +39,6 @@ dbri*{shm,wal,sqlite}
 *shm
 *wal
 .DS*.DS_Store
+
+.claude
+.pytest_cache/
