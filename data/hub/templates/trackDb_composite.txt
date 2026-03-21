@@ -1,0 +1,31 @@
+# trackDb_composite.txt — UCSC composite track header
+#
+# WHAT IS THIS FILE?
+#   This template defines the parent "compositeTrack" container that groups
+#   all dbRIP ME-type sub-tracks together in the UCSC browser. It appears
+#   once at the top of each assembly's trackDb.txt, followed by one sub-track
+#   stanza per ME type (generated from trackDb_subtrack.txt).
+#
+# WHY A COMPOSITE TRACK?
+#   A compositeTrack groups related sub-tracks so they can be expanded,
+#   collapsed, and configured together in the UCSC browser's track controls.
+#   It mirrors how the original dbRIP hub appeared under "Variation and Repeats".
+#
+# HOW IS IT USED?
+#   The build script writes this header to hub/{assembly}/trackDb.txt, then
+#   appends one rendered copy of trackDb_subtrack.txt per ME type beneath it.
+#
+# UCSC FORMAT RULES:
+#   - "compositeTrack on" marks this as the parent container
+#   - "group varRep" places it in UCSC's Variation and Repeats section
+#   - "html dbRIP" links to hub/{assembly}/dbRIP.html for the description popup
+#   - "type bigBed 6" — all sub-tracks must also declare the same type
+
+track dbRIP
+compositeTrack on
+shortLabel dbRIP
+longLabel Retrotransposon Insertion Polymorphisms (dbRIP)
+group varRep
+visibility pack
+type bigBed 6
+html dbRIP

@@ -1,0 +1,42 @@
+# trackDb_subtrack.txt — UCSC sub-track stanza template
+#
+# WHAT IS THIS FILE?
+#   This template defines one sub-track for a single ME type (e.g. ALU, LINE1,
+#   SVA, HERVK). The build script renders one copy of this per ME type returned
+#   by the API and appends them all to hub/{assembly}/trackDb.txt below the
+#   composite header (trackDb_composite.txt).
+#
+# HOW IS IT USED?
+#   The build script (scripts/build_trackhub.py) calls GET /v1/stats?by=me_type
+#   to discover all ME types present in the database, then renders this template
+#   once per type. New ME types added to the CSV automatically get their own
+#   sub-track the next time the hub is built — no template changes needed.
+#
+# TEMPLATE VARIABLES (all replaced by the build script at build time):
+#   {me_type}       — ME type as-is, e.g. "ALU", "LINE1", "HERVK"
+#   {me_type_lower} — lowercase ME type used in the .bb filename, e.g. "alu"
+#   {assembly}      — genome assembly, e.g. "hg38"
+#   {hub_url}       — public base URL where hub files are hosted
+#   {color}         — RGB color string, e.g. "200,0,0"
+#                     assigned from a fixed color map in the script:
+#                       ALU=200,0,0  LINE1=0,0,180  SVA=0,150,0  HERVK=150,0,150
+#                     unknown ME types receive a gray fallback: 100,100,100
+#
+# UCSC FORMAT RULES:
+#   - "parent dbRIP" links this sub-track to the composite track above
+#   - Sub-tracks are indented with 4 spaces (UCSC convention)
+#   - "searchIndex name" enables searching by dbRIP insertion ID (field 4)
+#   - "labelFields name" + "defaultLabelFields name" show the ID as the label
+#   - "type bigBed 6" must match the composite parent's type declaration
+
+    track dbRIP_{me_type}
+    parent dbRIP
+    bigDataUrl {hub_url}/{assembly}/dbrip_{me_type_lower}_{assembly}.bb
+    shortLabel dbRIP {me_type}
+    longLabel dbRIP — Polymorphic {me_type} Insertions
+    type bigBed 6
+    color {color}
+    visibility pack
+    labelFields name
+    defaultLabelFields name
+    searchIndex name

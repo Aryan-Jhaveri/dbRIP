@@ -1,0 +1,23 @@
+# genomes.txt — UCSC Track Hub assembly list
+#
+# WHAT IS THIS FILE?
+#   This template defines one stanza per genome assembly the hub supports.
+#   The UCSC browser reads this after hub.txt to know which assemblies are
+#   available and where each assembly's track definitions (trackDb.txt) live.
+#
+# HOW IS IT USED?
+#   This file is a TEMPLATE. The build script (scripts/build_trackhub.py)
+#   builds the output hub/genomes.txt by rendering one copy of this stanza
+#   per assembly it successfully produced bigBed files for. Assemblies that
+#   were skipped (e.g. hg19 when no FASTA was provided) are omitted.
+#
+# TEMPLATE VARIABLES:
+#   {assembly} — replaced with the assembly name, e.g. "hg38" or "hg19"
+#
+# UCSC FORMAT RULES:
+#   - One blank line between assembly stanzas
+#   - "genome" must match a UCSC assembly name exactly (hg38, hg19, mm10, etc.)
+#   - "trackDb" path is relative to the hub root (where hub.txt lives)
+
+genome {assembly}
+trackDb {assembly}/trackDb.txt

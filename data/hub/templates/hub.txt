@@ -1,0 +1,27 @@
+# hub.txt — UCSC Track Hub entry point
+#
+# WHAT IS THIS FILE?
+#   This is the first file the UCSC Genome Browser fetches when a user loads
+#   the dbRIP Track Hub. It identifies the hub, provides contact information,
+#   and points to genomes.txt which lists the assemblies the hub supports.
+#
+# HOW IS IT USED?
+#   This file is a TEMPLATE. The build script (scripts/build_trackhub.py)
+#   copies it to hub/hub.txt and replaces {hub_url} with the actual public URL
+#   where the hub is hosted (e.g. https://aryan-jhaveri.github.io/dbRIP/hub).
+#
+# UCSC FORMAT RULES:
+#   - Lines starting with # are comments (ignored by UCSC)
+#   - Each field is on its own line: key value
+#   - The "hub" value (dbRIP) must have no spaces — UCSC uses it as an identifier
+#   - genomesFile is resolved relative to hub.txt — just the filename, no full URL
+#
+# TO LOAD THIS HUB IN UCSC:
+#   My Data → Track Hubs → My Hubs → paste the hub.txt URL
+
+hub dbRIP
+shortLabel dbRIP
+longLabel Database of Retrotransposon Insertion Polymorphisms (Liang Lab, Brock University)
+genomesFile genomes.txt
+email liang@brocku.ca
+descriptionUrl https://dbrip.org
