@@ -5,8 +5,8 @@ Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 p
 | Service | URL |
 |---------|-----|
 | API + Web App | https://dbrip-api.onrender.com |
-| Frontend (GitHub Pages) | https://aryan-jhaveri.github.io/dbRIP-API/ |
-| UCSC Track Hub | [Load in UCSC](https://genome.ucsc.edu/cgi-bin/hgTracks?hubUrl=https://aryan-jhaveri.github.io/dbRIP-API/hub/hub.txt) |
+| Frontend (GitHub Pages) | https://aryan-jhaveri.github.io/dbRIP/ |
+| UCSC Track Hub | [Load in UCSC](https://genome.ucsc.edu/cgi-bin/hgTracks?hubUrl=https://aryan-jhaveri.github.io/dbRIP/hub/hub.txt) |
 
 > **Note:** When the lab forks this repo, the GitHub Pages URLs update automatically (the CI workflow builds them from the repo owner/name). The Render API URL is set in `.github/workflows/build-trackhub.yml`.
 
@@ -16,9 +16,9 @@ Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 p
 
 | Component | What it is | How to get it |
 |-----------|-----------|---------------|
-| **CLI** | `dbrip` terminal tool — search, export, stats | `pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP-API.git"` |
+| **CLI** | `dbrip` terminal tool — search, export, stats | `pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"` |
 | **MCP** | Claude connector — query the DB in natural language | Claude Desktop config (no install) |
-| **API** | FastAPI backend + REST endpoints | `pip install "dbrip-api[api] @ git+https://github.com/Aryan-Jhaveri/dbRIP-API.git"` |
+| **API** | FastAPI backend + REST endpoints | `pip install "dbrip-api[api] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"` |
 | **Frontend** | React web app (6 tabs, IGV viewer) | Served by the API or via GitHub Pages |
 | **Track Hub** | UCSC Genome Browser integration — bigBed tracks per ME family | Built by CI, hosted on GitHub Pages |
 | **Full stack** | Everything above, one container | `docker run` or Render blueprint |
@@ -32,7 +32,7 @@ The track hub lets any researcher load dbRIP insertions directly in the UCSC Gen
 **Load the hub:**
 My Data → Track Hubs → My Hubs → paste:
 ```
-https://aryan-jhaveri.github.io/dbRIP-API/hub/hub.txt
+https://aryan-jhaveri.github.io/dbRIP/hub/hub.txt
 ```
 
 **How it works:**
@@ -61,7 +61,7 @@ Most lab members only need this. No cloning required — installs straight from 
 
 **1. Install**
 ```bash
-pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP-API.git"
+pip install "dbrip-api[cli] @ git+https://github.com/Aryan-Jhaveri/dbRIP.git"
 ```
 
 **2. Point it at a server**
@@ -131,8 +131,8 @@ Six tabs:
 ## Self-hosting
 
 ```bash
-git clone https://github.com/Aryan-Jhaveri/dbRIP-API.git
-cd dbRIP-API
+git clone https://github.com/Aryan-Jhaveri/dbRIP.git
+cd dbRIP
 docker build -t dbrip-api .
 docker run -p 8000:8000 dbrip-api
 ```

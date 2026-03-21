@@ -27,6 +27,17 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  // BASE PATH — controls the prefix for all asset URLs in the built HTML.
+  //
+  // On GitHub Pages the site is served under /<repo-name>/ (e.g. /dbRIP/),
+  // so asset paths must be /dbRIP/assets/index-xxx.js, not /assets/index-xxx.js.
+  // Without this, the browser requests /assets/... which returns a 404 (or the
+  // GitHub Pages HTML fallback), causing "disallowed MIME type" errors.
+  //
+  // In CI, the workflow sets VITE_BASE_PATH=/<repo-name>/ dynamically so forks
+  // get the right prefix automatically. In local dev it defaults to "/" (root).
+  base: process.env.VITE_BASE_PATH || "/",
+
   plugins: [react(), tailwindcss()],
 
   // Proxy API requests to FastAPI during development

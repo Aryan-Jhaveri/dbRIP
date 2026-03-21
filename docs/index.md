@@ -51,7 +51,7 @@ The CSV is the source of truth. The database is always rebuildable. The API is r
 
 ## Next Steps
 
-- **Setup** — see the [README](https://github.com/liang-lab/dbRIP-API#readme) for installation, data loading, and running the server
+- **Setup** — see the [README](https://github.com/liang-lab/dbRIP#readme) for installation, data loading, and running the server
 - [API Reference](api-reference.md) — all endpoints with examples
 - [CLI Tool](cli.md) — terminal-based querying
 - [Biology Background](biology.md) — what are transposable elements?

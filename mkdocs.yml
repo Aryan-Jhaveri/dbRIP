@@ -10,7 +10,7 @@
 
 site_name: dbRIP API
 site_description: Read-only API for the dbRIP database of retrotransposon insertion polymorphisms
-repo_url: https://github.com/liang-lab/dbRIP-API
+repo_url: https://github.com/liang-lab/dbRIP
 
 theme:
   name: material

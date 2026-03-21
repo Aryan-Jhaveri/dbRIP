@@ -288,7 +288,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 # Dry run
 python scripts/build_trackhub.py \
   --api-url http://localhost:8000 \
-  --hub-url https://aryan-jhaveri.github.io/dbRIP-API/hub \
+  --hub-url https://aryan-jhaveri.github.io/dbRIP/hub \
   --dry-run
 
 # Check output
@@ -317,7 +317,7 @@ chmod +x bedToBigBed fetchChromSizes
 # Full build (API must be running)
 python scripts/build_trackhub.py \
   --api-url http://localhost:8000 \
-  --hub-url https://aryan-jhaveri.github.io/dbRIP-API/hub
+  --hub-url https://aryan-jhaveri.github.io/dbRIP/hub
 
 # Check output
 ls hub/hg38/

@@ -143,8 +143,8 @@ jobs:
       # ME types are auto-detected from GET /v1/stats?by=me_type — no hardcoding.
       # The hub URL is built from GitHub context variables so it works after a fork:
       #   owner:  ${{ github.repository_owner }}   e.g. aryan-jhaveri (or the lab)
-      #   repo:   ${{ github.event.repository.name }} e.g. dbRIP-API
-      #   result: https://aryan-jhaveri.github.io/dbRIP-API/hub
+      #   repo:   ${{ github.event.repository.name }} e.g. dbRIP
+      #   result: https://aryan-jhaveri.github.io/dbRIP/hub
       - name: Build Track Hub
         run: |
           python scripts/build_trackhub.py \
@@ -180,6 +180,10 @@ jobs:
         working-directory: frontend
         env:
           VITE_API_URL: ${{ env.RENDER_API_URL }}
+          # VITE_BASE_PATH tells Vite to prefix all asset URLs with /<repo>/.
+          # Without this, the built HTML references /assets/index-xxx.js which
+          # 404s on GitHub Pages (the site lives at /<repo>/, not /).
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
         run: npm run build
 
       # ── Step 12: Deploy frontend to GitHub Pages root (/) ─────────────────
