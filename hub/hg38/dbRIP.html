@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>dbRIP — Retrotransposon Insertion Polymorphisms</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 2em auto; line-height: 1.6; color: #222; }
+    h1 { font-size: 1.4em; border-bottom: 2px solid #003366; padding-bottom: 0.3em; }
+    h2 { font-size: 1.1em; color: #003366; margin-top: 1.8em; }
+    table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+    th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: left; }
+    th { background: #eef2f7; }
+    .color-swatch { display: inline-block; width: 14px; height: 14px;
+                    border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+    a { color: #003366; }
+  </style>
+</head>
+<body>
+
+<h1>dbRIP — Database of Retrotransposon Insertion Polymorphisms</h1>
+
+<h2>Track Description</h2>
+<p>
+  This track displays polymorphic mobile element insertions (MEIs) from the
+  <strong>dbRIP</strong> database maintained by the
+  <a href="https://brocku.ca" target="_blank">Liang Lab at Brock University</a>.
+  dbRIP catalogs transposable element insertion polymorphisms across human
+  populations, derived from the
+  <a href="https://www.internationalgenome.org/" target="_blank">1000 Genomes Project</a>.
+  Each item represents a single insertion locus; clicking an item shows its
+  dbRIP ID which can be used to query the full dataset via the
+  <a href="https://dbrip-api.onrender.com/docs" target="_blank">dbRIP API</a>.
+</p>
+<p>
+  The database currently contains 44,984 TE insertion polymorphisms genotyped
+  across 33 populations (2,504 individuals).
+</p>
+
+<h2>Display Conventions and Configuration</h2>
+<p>
+  Insertions are grouped into sub-tracks by mobile element family.
+  Each sub-track can be independently shown, hidden, or reconfigured via the
+  track controls panel.
+</p>
+<table>
+  <tr>
+    <th>Sub-track</th>
+    <th>Color</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>dbRIP ALU</td>
+    <td><span class="color-swatch" style="background:rgb(200,0,0)"></span>Red</td>
+    <td>Polymorphic <em>Alu</em> SINE insertions</td>
+  </tr>
+  <tr>
+    <td>dbRIP LINE1</td>
+    <td><span class="color-swatch" style="background:rgb(0,0,180)"></span>Navy</td>
+    <td>Polymorphic LINE-1 (L1) insertions</td>
+  </tr>
+  <tr>
+    <td>dbRIP SVA</td>
+    <td><span class="color-swatch" style="background:rgb(0,150,0)"></span>Green</td>
+    <td>Polymorphic SVA (SINE-R/VNTR/Alu) insertions</td>
+  </tr>
+  <tr>
+    <td>dbRIP HERVK</td>
+    <td><span class="color-swatch" style="background:rgb(150,0,150)"></span>Purple</td>
+    <td>Polymorphic HERV-K endogenous retrovirus insertions</td>
+  </tr>
+  <tr>
+    <td><em>Other types</em></td>
+    <td><span class="color-swatch" style="background:rgb(100,100,100)"></span>Gray</td>
+    <td>Any additional ME families present in future dataset releases</td>
+  </tr>
+</table>
+<p>
+  Insertion IDs (e.g. <code>A0000001</code>) can be entered into the UCSC
+  browser's search box to jump directly to a specific insertion.
+  Type the ID and press Enter — the browser will navigate to that locus with
+  the insertion highlighted.
+</p>
+
+<h2>Methods</h2>
+<p>
+  Insertion coordinates were originally derived from the 1000 Genomes Project
+  whole-genome sequencing data and catalogued in dbRIP. The hg38 coordinates
+  in this track are sourced directly from the dbRIP dataset (assembly: GRCh38).
+  Population allele frequencies represent the proportion of individuals in each
+  1000 Genomes population carrying the insertion.
+</p>
+<p>
+  Track files (bigBed format) are rebuilt automatically when the underlying
+  dataset is updated, via a GitHub Actions CI pipeline that exports BED data
+  from the dbRIP API, sorts and indexes it with UCSC's
+  <code>bedToBigBed</code> tool, and deploys the result to GitHub Pages.
+</p>
+
+<h2>Credits</h2>
+<p>
+  dbRIP is developed and maintained by the
+  <strong>Liang Lab</strong> at Brock University, St. Catharines, Ontario, Canada.
+  Principal Investigator: Dr. Ping Liang.
+</p>
+<p>
+  Population genotype data: 1000 Genomes Project Consortium.
+</p>
+<p>
+  Track Hub infrastructure: dbRIP-API project
+  (<a href="https://github.com/Aryan-Jhaveri/dbRIP" target="_blank">GitHub</a>).
+</p>
+
+<h2>References</h2>
+<ul>
+  <li>
+    Wang J, Song L, Gonder MK, Azrak S, Ray DA, Batzer MA, Tishkoff SA, Liang P.
+    <strong>Whole genome computational comparative genomics: A fruitful approach
+    for ascertaining Alu insertion polymorphisms.</strong>
+    <em>Gene</em>. 2006 Jan 17;365:11-20.
+    <a href="https://doi.org/10.1016/j.gene.2005.09.031" target="_blank">doi:10.1016/j.gene.2005.09.031</a>
+  </li>
+  <li>
+    Tang W, Mun S, Joshi A, Han K, Liang P.
+    <strong>Mobile elements contribute to the uniqueness of human genome with 15,000
+    human-specific insertions and 14 Mbp sequence increase.</strong>
+    <em>DNA Research</em>. 2018 Oct 1;25(5):521-533.
+    <a href="https://doi.org/10.1093/dnares/dsy022" target="_blank">doi:10.1093/dnares/dsy022</a>
+  </li>
+</ul>
+
+</body>
+</html>
