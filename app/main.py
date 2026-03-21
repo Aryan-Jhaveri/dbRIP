@@ -42,7 +42,18 @@ app = FastAPI(
 # ── Middleware ────────────────────────────────────────────────────────────
 
 # Allow requests from any origin (suitable for a public read-only API).
-# If you want to restrict this later, replace ["*"] with specific domains.
+#
+# WHY ["*"]?
+#   The API is read-only and intentionally public — any researcher should be
+#   able to query it from any tool or website. Restricting by origin would
+#   block legitimate use without any security benefit.
+#
+# KNOWN PRODUCTION CONSUMERS:
+#   - GitHub Pages frontend: https://aryan-jhaveri.github.io/dbRIP/
+#     (when the lab forks the repo the domain will change, but ["*"] keeps
+#     working without needing an update here)
+#   - UCSC Track Hub: the browser fetches bigBed files directly from GitHub
+#     Pages, not from this API — so CORS on the hub files is Pages' concern
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
