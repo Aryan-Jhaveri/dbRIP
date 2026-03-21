@@ -4,16 +4,17 @@
 
 ## Contents
 
-1. [Quick start](#1-quick-start)
-2. [How the programs fit together](#2-how-the-programs-fit-together)
-3. [Maintenance — changing the data or schema](#3-maintenance--changing-the-data-or-schema)
+1. [Taking over this project](#1-taking-over-this-project)
+2. [Quick start](#2-quick-start)
+3. [How the programs fit together](#3-how-the-programs-fit-together)
+4. [Maintenance — changing the data or schema](#4-maintenance--changing-the-data-or-schema)
    - [Rebuild the database](#rebuild-the-database)
    - [Add a new population column](#add-a-new-population-column)
    - [Rename a population column](#rename-a-population-column)
    - [Add a new metadata column](#add-a-new-metadata-column)
    - [Rename a metadata column](#rename-a-metadata-column)
    - [Add / edit / remove a single row](#add--edit--remove-a-single-row)
-4. [Track Hub — building and deploying](#4-track-hub--building-and-deploying)
+5. [Track Hub — building and deploying](#5-track-hub--building-and-deploying)
    - [What the track hub is](#what-the-track-hub-is)
    - [Build locally (dry run)](#build-locally-dry-run)
    - [Build locally (full)](#build-locally-full)
@@ -21,12 +22,87 @@
    - [How CI deploys automatically](#how-ci-deploys-automatically)
    - [Check if the hub is stale](#check-if-the-hub-is-stale)
    - [Update when the repo is forked](#update-when-the-repo-is-forked)
-5. [File reference](#5-file-reference)
-6. [How a request flows through the system](#6-how-a-request-flows-through-the-system)
+6. [File reference](#6-file-reference)
+7. [How a request flows through the system](#7-how-a-request-flows-through-the-system)
 
 ---
 
-## 1. Quick start
+## 1. Taking over this project
+
+If you're a new lab member inheriting this project, this section is all you need
+to read first. Everything else in this guide is reference material.
+
+### What GitHub handles automatically
+
+Every push to `main` triggers a CI workflow (`.github/workflows/build-trackhub.yml`) that:
+
+1. Rebuilds the SQLite database from the CSV
+2. Builds the React frontend
+3. Generates bigBed files for the UCSC track hub
+4. Deploys both the frontend and hub to **GitHub Pages** automatically
+
+You never run these steps manually. Push code → GitHub does the rest. The deployed
+URLs are:
+
+```
+Frontend:  https://<owner>.github.io/<repo>/
+Track hub: https://<owner>.github.io/<repo>/hub/hub.txt
+```
+
+### What you run yourself
+
+The **FastAPI backend** (the Python server that answers data queries) must run on a
+machine your lab controls. GitHub Pages only serves static files — it cannot run Python.
+
+Your options, in order of preference:
+
+| Option | Notes |
+|--------|-------|
+| Lab server or university VM | Most stable for long-term hosting |
+| Cloud VM (AWS, GCP, Azure) | Good if no in-house server is available |
+| Render / Railway / Fly.io | Fine for demos; free tiers may sleep after inactivity |
+| Your laptop | Development only — not accessible to the outside world |
+
+### The one thing you must update
+
+Open `.github/workflows/build-trackhub.yml` and set `API_BASE_URL` to the public
+URL of wherever you're hosting the API:
+
+```yaml
+env:
+  API_BASE_URL: https://your-server.university.edu/v1   # ← change this
+```
+
+After saving, either push any file to `main` or go to **Actions → "Build Track Hub +
+Frontend" → Run workflow** to trigger a rebuild. The new URL is baked into the
+compiled frontend JS at build time.
+
+### How to run the API on a new machine
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/<your-org>/<repo>.git
+cd <repo>
+
+# 2. Create a virtual environment and install dependencies
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[api,ingest]"
+
+# 3. Load the CSV into SQLite (must be done before starting the server)
+python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
+
+# 4. Start the API server
+#    --host 0.0.0.0 makes it reachable from other machines on the network.
+#    For production, run behind nginx or a systemd service rather than directly.
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+The API is now live at `http://your-server:8000`. Point `API_BASE_URL` at it.
+
+---
+
+## 2. Quick start
 
 ```bash
 # Activate the virtual environment
@@ -52,7 +128,7 @@ cd frontend && npm run dev
 
 ---
 
-## 2. How the programs fit together
+## 3. How the programs fit together
 
 There are three completely separate programs in this repo. They share a database
 but **never import each other**:
@@ -93,7 +169,7 @@ Key design rules:
 
 ---
 
-## 3. Maintenance — changing the data or schema
+## 4. Maintenance — changing the data or schema
 
 > **Never edit the SQLite database directly.** It is always rebuilt from the CSV
 > and manifest by running `scripts/ingest.py`. Any direct edits will be lost the
@@ -193,7 +269,7 @@ cd frontend && npx tsc --noEmit
 |---|------|--------|
 | 1 | `data/raw/*.csv` | Add column header and fill in values |
 | 2 | `data/manifests/dbrip_v1.yaml` | Add `source_study: source_study` to `column_map` |
-| 3 | *(check)* `ingest/dbrip.py` | If the column needs type coercion or splitting, add it in `_transform`. Plain strings pass through automatically. |
+| 3 | *(check)* `ingest/dbrip.py` | If the column needs type coercion or special handling, add it in `normalize()`. Plain strings pass through automatically. |
 | 4 | *(run)* | Re-ingest |
 | 5 | `app/models.py` | Add `source_study = Column(String, nullable=True)` to `Insertion` |
 | 6 | `app/schemas.py` | Add `source_study: str \| None` to `InsertionSummary` and/or `InsertionDetail` |
@@ -259,7 +335,7 @@ INSERT INTO insertions (id, chrom, start, end, me_category, me_type, ...)
 
 ---
 
-## 4. Track Hub — building and deploying
+## 5. Track Hub — building and deploying
 
 ### What the track hub is
 
@@ -346,10 +422,15 @@ pipeline whenever `data/raw/dbRIP_all.csv` or `frontend/src/**` changes on `main
 1. Builds SQLite from CSV
 2. Starts uvicorn locally on the CI runner
 3. Runs `build_trackhub.py` → bigBed files + hub config
-4. Builds the React frontend with `VITE_API_URL` baked in
+4. Builds the React frontend with `API_BASE_URL` baked in
 5. Deploys both to the `gh-pages` branch (frontend at `/`, hub at `/hub/`)
 
 You can also trigger it manually: GitHub → Actions → "Build Track Hub + Frontend" → Run workflow.
+
+> **Note:** The CI workflow only triggers on changes to `data/raw/`, `frontend/src/`,
+> `data/hub/templates/`, and the workflow file itself. If you only change Python
+> backend files (`app/`, `ingest/`), the Render/server deployment updates automatically
+> but you must manually trigger the workflow to rebuild the frontend.
 
 ### Check if the hub is stale
 
@@ -375,12 +456,12 @@ https://<owner>.github.io/<repo>/hub
 ```
 
 When the lab forks this repo, the URL updates automatically. The only thing to change
-is the `RENDER_API_URL` env var in `.github/workflows/build-trackhub.yml` if the
-Render API moves to a different host.
+is `API_BASE_URL` in `.github/workflows/build-trackhub.yml` if the API moves to a
+different host.
 
 ---
 
-## 5. File reference
+## 6. File reference
 
 ### `data/manifests/dbrip_v1.yaml`
 
@@ -588,7 +669,7 @@ Test database: a pytest fixture creates a temporary SQLite DB, loads the 5-row f
 
 ---
 
-## 6. How a request flows through the system
+## 7. How a request flows through the system
 
 ```
 Browser sends:  GET /v1/insertions?me_type=ALU&limit=10

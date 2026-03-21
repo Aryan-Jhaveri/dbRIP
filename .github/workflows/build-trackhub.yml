@@ -29,7 +29,7 @@
 #   updates automatically — no changes needed here.
 #
 # RENDER API URL:
-#   The RENDER_API_URL env variable at the top of the job tells the React
+#   The API_BASE_URL env variable at the top of the job tells the React
 #   frontend where to find the backend at runtime. Update it if the API
 #   moves to a different host.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -67,10 +67,19 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Public URL of the FastAPI backend hosted on Render.
-      # The React frontend is compiled with this URL baked into the JS bundle.
-      # Update this value if the API moves to a different host.
-      RENDER_API_URL: https://dbrip-api.onrender.com/v1
+      # ── THE ONE THING YOU MUST UPDATE ─────────────────────────────────────────
+      # Public URL of the FastAPI backend — wherever your lab is hosting it.
+      #
+      # The React frontend is compiled with this URL baked into the JS bundle at
+      # build time. After changing it, push any file to main (or go to
+      # Actions → "Build Track Hub + Frontend" → Run workflow) to trigger a rebuild.
+      #
+      # Examples:
+      #   https://your-server.university.edu/v1   ← lab server (recommended)
+      #   https://your-app.onrender.com/v1        ← Render free tier (MVP only)
+      #   http://localhost:8000/v1                ← local dev only, not for CI
+      # ──────────────────────────────────────────────────────────────────────────
+      API_BASE_URL: https://dbrip-api.onrender.com/v1
 
     steps:
       # ── Step 1: Checkout ───────────────────────────────────────────────────
@@ -182,7 +191,7 @@ jobs:
       - name: Build frontend
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ env.RENDER_API_URL }}
+          VITE_API_URL: ${{ env.API_BASE_URL }}
           # VITE_BASE_PATH tells Vite to prefix all asset URLs with /<repo>/.
           # Without this, the built HTML references /assets/index-xxx.js which
           # 404s on GitHub Pages (the site lives at /<repo>/, not /).
