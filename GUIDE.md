@@ -14,6 +14,7 @@
    - [Add a new metadata column](#add-a-new-metadata-column)
    - [Rename a metadata column](#rename-a-metadata-column)
    - [Add / edit / remove a single row](#add--edit--remove-a-single-row)
+   - [Rows with swapped coordinates (known data issue)](#rows-with-swapped-coordinates-known-data-issue)
 5. [Track Hub — building and deploying](#5-track-hub--building-and-deploying)
    - [What the track hub is](#what-the-track-hub-is)
    - [Build locally (dry run)](#build-locally-dry-run)
@@ -320,6 +321,41 @@ INSERT INTO insertions (id, chrom, start, end, me_category, me_type, ...)
 -- Also add 33 rows to pop_frequencies for this insertion if needed.
 .quit
 ```
+
+---
+
+### Rows with swapped coordinates (known data issue)
+
+132 rows in the source CSV have `End < Start` — the two coordinate columns appear
+to be swapped. These rows are preserved in the database and fully queryable via the
+API and frontend (per the "no data cleaning" rule), but they are **silently excluded
+from the UCSC track hub** because bigBed requires `end > start`.
+
+**Breakdown:**
+
+| ME type | Dropped from hub | Total in DB | % missing |
+|---------|-----------------|-------------|-----------|
+| ALU     | 107             | 33,709      | 0.32%     |
+| LINE1   | 14              | 6,468       | 0.22%     |
+| SVA     | 9               | 4,697       | 0.19%     |
+| HERVK   | 2               | 101         | 1.98%     |
+| PP      | 0               | 9           | 0%        |
+
+**To get the full list for the database curator:**
+
+```bash
+sqlite3 dbrip.sqlite \
+  "SELECT id, chrom, start, \"end\", me_type FROM insertions WHERE \"end\" < start ORDER BY me_type;" \
+  > invalid_coords.txt
+```
+
+**What to do:**
+
+- If the lab confirms the coordinates are simply swapped: fix `Start` and `End` in
+  `data/raw/dbRIP_all.csv` for those 132 rows, then re-ingest. The track hub will
+  pick them up on the next CI run.
+- If the source data is considered authoritative and not to be modified: leave as-is.
+  The 132 rows remain in the API; the track hub gap is expected and documented here.
 
 ---
 

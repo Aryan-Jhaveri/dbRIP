@@ -8,7 +8,7 @@ Read-only database of 44,984 retrotransposon insertion polymorphisms across 33 p
 | Frontend (GitHub Pages) | https://aryan-jhaveri.github.io/dbRIP/ |
 | UCSC Track Hub | [Load in UCSC](https://genome.ucsc.edu/cgi-bin/hgTracks?hubUrl=https://aryan-jhaveri.github.io/dbRIP/hub/hub.txt) |
 
-> **Note:** When the lab forks this repo, the GitHub Pages URLs update automatically (the CI workflow builds them from the repo owner/name). The Render API URL is set in `.github/workflows/build-trackhub.yml`.
+> **Note:** When the lab forks this repo, the GitHub Pages URLs update automatically (the CI workflow builds them from the repo owner/name). The API URL is set via `API_BASE_URL` in `.github/workflows/build-trackhub.yml` — update it to wherever the lab is hosting the FastAPI backend.
 
 ---
 
@@ -39,6 +39,9 @@ https://aryan-jhaveri.github.io/dbRIP/hub/hub.txt
 - CI exports BED6 per ME type from the API → sorts → converts to bigBed (indexed binary)
 - UCSC fetches only the visible region via HTTP byte-range requests — no full download
 - The hub rebuilds automatically when `data/raw/dbRIP_all.csv` is pushed to `main`
+
+> **Known data issue:** 132 rows in the source CSV have `End < Start` (coordinates appear swapped). These rows are present and queryable in the API and frontend but are excluded from the track hub, which requires `end > start`. See GUIDE.md §4 for the full breakdown and how to fix them in the CSV.
+
 
 **Architecture:**
 ```
