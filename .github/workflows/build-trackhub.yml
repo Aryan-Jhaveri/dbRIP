@@ -1,0 +1,207 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# .github/workflows/build-trackhub.yml
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# WHAT THIS WORKFLOW DOES:
+#   Whenever the source data or frontend changes, this workflow:
+#     1. Rebuilds the SQLite database from the CSV
+#     2. Starts the API server locally on the runner
+#     3. Exports bigBed files (one per ME type) via the API
+#     4. Renders hub config templates → hub/ directory
+#     5. Builds the React frontend with the production API URL baked in
+#     6. Deploys both to the gh-pages branch:
+#          /        ← React frontend
+#          /hub/    ← UCSC Track Hub files
+#
+# WHEN IT RUNS:
+#   - Automatically when data/raw/dbRIP_all.csv changes (new data = new hub)
+#   - Automatically when frontend source changes (new UI = new build)
+#   - Manually from GitHub UI → Actions → "Build Track Hub + Frontend" → Run workflow
+#
+# AFTER A SUCCESSFUL RUN:
+#   Frontend: https://<owner>.github.io/<repo>/
+#   Hub URL:  https://<owner>.github.io/<repo>/hub/hub.txt
+#   UCSC:     https://genome.ucsc.edu/cgi-bin/hgTracks?hubUrl=https://<owner>.github.io/<repo>/hub/hub.txt
+#
+# NOTE FOR THE LAB:
+#   The hub URL is built dynamically from github.repository_owner and
+#   github.event.repository.name. When you fork this repo, the hub URL
+#   updates automatically — no changes needed here.
+#
+# RENDER API URL:
+#   The RENDER_API_URL env variable at the top of the job tells the React
+#   frontend where to find the backend at runtime. Update it if the API
+#   moves to a different host.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Build Track Hub + Frontend → GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      # Hub rebuild triggers — data or templates or build script changed
+      - "data/raw/dbRIP_all.csv"
+      - "data/hub/templates/**"
+      - "scripts/build_trackhub.py"
+      # Frontend rebuild triggers — source or deps changed
+      - "frontend/src/**"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+
+  # Manual trigger from the GitHub Actions UI.
+  # Use this to force a rebuild without changing any files —
+  # e.g. after updating the Render API or after a failed deploy.
+  workflow_dispatch:
+
+# Write permission is required to push commits to the gh-pages branch.
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    name: Build hub + frontend, deploy to GitHub Pages
+    runs-on: ubuntu-latest
+
+    env:
+      # Public URL of the FastAPI backend hosted on Render.
+      # The React frontend is compiled with this URL baked into the JS bundle.
+      # Update this value if the API moves to a different host.
+      RENDER_API_URL: https://dbrip-api.onrender.com/v1
+
+    steps:
+      # ── Step 1: Checkout ───────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Step 2: Set up Python ──────────────────────────────────────────────
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          # Cache downloaded pip packages between workflow runs.
+          # This avoids re-downloading packages on every push.
+          cache: "pip"
+
+      # ── Step 3: Install Python dependencies ───────────────────────────────
+      # ".[all]" installs the api, ingest, cli, and trackhub dep groups.
+      # We don't install [dev] (pytest, ruff) — no tests run in this workflow.
+      - name: Install Python dependencies
+        run: pip install -e ".[all]"
+
+      # ── Step 4: Download UCSC static binaries ──────────────────────────────
+      # WHY STATIC BINARIES INSTEAD OF CONDA?
+      #   conda takes ~2 minutes to solve the environment.
+      #   Pre-built static binaries download in ~5 seconds.
+      #   They work on any Linux x86_64 runner without any extra setup.
+      #
+      # We download to the current directory and add it to $GITHUB_PATH,
+      # which makes the tools available by name in all subsequent steps.
+      - name: Download UCSC tools (bedToBigBed, fetchChromSizes)
+        run: |
+          wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedToBigBed
+          wget -q https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/fetchChromSizes
+          chmod +x bedToBigBed fetchChromSizes
+          # Add the current directory to PATH for all subsequent steps
+          echo "$PWD" >> $GITHUB_PATH
+
+      # ── Step 5: Build SQLite database ─────────────────────────────────────
+      # CRITICAL: This MUST complete before uvicorn starts.
+      # The API reads from dbrip.sqlite — if the server starts before ingest
+      # finishes, GET /v1/export returns 0 rows and bedToBigBed fails on
+      # an empty input file.
+      - name: Build database from CSV
+        run: |
+          python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
+
+      # ── Step 6: Start API server in background ─────────────────────────────
+      # The '&' sends uvicorn to the background so the next step can run.
+      # We bind to 127.0.0.1 (localhost only) — the runner doesn't need to
+      # be reachable from the internet, only from build_trackhub.py on the same machine.
+      - name: Start API server
+        run: uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+
+      # ── Step 7: Wait for API to be ready ──────────────────────────────────
+      # uvicorn takes ~2 seconds to start. We poll the health endpoint up to
+      # 30 times (1s apart). If it never responds, we exit with an error so
+      # the workflow fails loudly instead of silently producing empty bigBed files.
+      - name: Wait for API health check
+        run: |
+          echo "Waiting for API to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/v1/health > /dev/null; then
+              echo "API is ready (attempt $i/30)"
+              exit 0
+            fi
+            echo "  attempt $i/30 — not ready yet, sleeping 1s"
+            sleep 1
+          done
+          echo "ERROR: API did not respond after 30 attempts"
+          exit 1
+
+      # ── Step 8: Build Track Hub (bigBed files + config) ───────────────────
+      # ME types are auto-detected from GET /v1/stats?by=me_type — no hardcoding.
+      # The hub URL is built from GitHub context variables so it works after a fork:
+      #   owner:  ${{ github.repository_owner }}   e.g. aryan-jhaveri (or the lab)
+      #   repo:   ${{ github.event.repository.name }} e.g. dbRIP-API
+      #   result: https://aryan-jhaveri.github.io/dbRIP-API/hub
+      - name: Build Track Hub
+        run: |
+          python scripts/build_trackhub.py \
+            --api-url http://localhost:8000 \
+            --hub-url https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/hub \
+            --assemblies hg38
+
+      # ── Step 9: Set up Node.js ─────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Step 10: Install frontend dependencies ─────────────────────────────
+      # "npm ci" (clean install) is preferred over "npm install" in CI because:
+      #   - It installs exactly the versions in package-lock.json (reproducible)
+      #   - It fails if package-lock.json is out of sync with package.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # ── Step 11: Build frontend ────────────────────────────────────────────
+      # VITE_API_URL is substituted into the JS bundle at build time by Vite.
+      # At runtime the browser reads this URL from the compiled JS — not from
+      # the environment. This is why we must pass it here, not as a runtime var.
+      #
+      # Without VITE_API_URL the frontend falls back to "/v1" (relative URL),
+      # which would silently target GitHub Pages instead of Render — API calls
+      # would 404 and the app would appear broken.
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ env.RENDER_API_URL }}
+        run: npm run build
+
+      # ── Step 12: Deploy frontend to GitHub Pages root (/) ─────────────────
+      # keep_files: true is CRITICAL here. Without it, this step deletes the
+      # entire gh-pages branch before writing, which would remove /hub/ before
+      # step 13 can restore it.
+      - name: Deploy frontend → GitHub Pages /
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: frontend/dist
+          keep_files: true
+
+      # ── Step 13: Deploy hub to GitHub Pages /hub/ ─────────────────────────
+      # destination_dir: hub places the hub/ contents under /hub/ on the
+      # gh-pages branch (not at the root, where it would overwrite the frontend).
+      # keep_files: true prevents this step from deleting the frontend files
+      # that step 12 just deployed.
+      - name: Deploy Track Hub → GitHub Pages /hub/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: hub
+          destination_dir: hub
+          keep_files: true

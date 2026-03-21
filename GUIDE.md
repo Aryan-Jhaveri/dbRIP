@@ -5,7 +5,7 @@
 ## Contents
 
 1. [Quick start](#1-quick-start)
-2. [How the three programs fit together](#2-how-the-three-programs-fit-together)
+2. [How the programs fit together](#2-how-the-programs-fit-together)
 3. [Maintenance — changing the data or schema](#3-maintenance--changing-the-data-or-schema)
    - [Rebuild the database](#rebuild-the-database)
    - [Add a new population column](#add-a-new-population-column)
@@ -13,8 +13,16 @@
    - [Add a new metadata column](#add-a-new-metadata-column)
    - [Rename a metadata column](#rename-a-metadata-column)
    - [Add / edit / remove a single row](#add--edit--remove-a-single-row)
-4. [File reference](#4-file-reference)
-5. [How a request flows through the system](#5-how-a-request-flows-through-the-system)
+4. [Track Hub — building and deploying](#4-track-hub--building-and-deploying)
+   - [What the track hub is](#what-the-track-hub-is)
+   - [Build locally (dry run)](#build-locally-dry-run)
+   - [Build locally (full)](#build-locally-full)
+   - [Test in UCSC browser](#test-in-ucsc-browser)
+   - [How CI deploys automatically](#how-ci-deploys-automatically)
+   - [Check if the hub is stale](#check-if-the-hub-is-stale)
+   - [Update when the repo is forked](#update-when-the-repo-is-forked)
+5. [File reference](#5-file-reference)
+6. [How a request flows through the system](#6-how-a-request-flows-through-the-system)
 
 ---
 
@@ -44,7 +52,7 @@ cd frontend && npm run dev
 
 ---
 
-## 2. How the three programs fit together
+## 2. How the programs fit together
 
 There are three completely separate programs in this repo. They share a database
 but **never import each other**:
@@ -251,7 +259,128 @@ INSERT INTO insertions (id, chrom, start, end, me_category, me_type, ...)
 
 ---
 
-## 4. File reference
+## 4. Track Hub — building and deploying
+
+### What the track hub is
+
+The UCSC Genome Browser can load custom datasets via a **Track Hub** — a small set
+of config files you host on any public HTTPS server. When a researcher loads the hub,
+UCSC shows dbRIP insertions as colored horizontal bars on the genome, one sub-track
+per ME family (ALU red, LINE1 blue, SVA green).
+
+The data lives in **bigBed** files — sorted, indexed binary files that UCSC fetches
+via HTTP byte-range requests (only the visible window, not the entire file). The
+build script (`scripts/build_trackhub.py`) converts the API's BED6 export into bigBed.
+
+### Build locally (dry run)
+
+Renders the hub config templates without calling bedToBigBed. No UCSC tools needed.
+You still need the API running (for `--me-types all` auto-detection), or pass
+`--me-types ALU LINE1 SVA` explicitly.
+
+```bash
+source .venv/bin/activate
+
+# Load DB and start API
+python scripts/ingest.py --manifest data/manifests/dbrip_v1.yaml
+uvicorn app.main:app --host 127.0.0.1 --port 8000 &
+
+# Dry run
+python scripts/build_trackhub.py \
+  --api-url http://localhost:8000 \
+  --hub-url https://aryan-jhaveri.github.io/dbRIP-API/hub \
+  --dry-run
+
+# Check output
+ls hub/
+# hub.txt  genomes.txt  hg38/trackDb.txt  hg38/dbRIP.html
+```
+
+### Build locally (full)
+
+Requires `bedToBigBed` and `fetchChromSizes` on PATH.
+
+```bash
+# Install UCSC tools (conda)
+conda install -c bioconda ucsc-bedtobigbed ucsc-fetchchromsizes
+
+# Or download static binaries (Linux x86_64)
+wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/bedToBigBed
+wget https://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/fetchChromSizes
+chmod +x bedToBigBed fetchChromSizes
+
+# macOS binaries (if on a Mac)
+wget https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/bedToBigBed
+wget https://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/fetchChromSizes
+chmod +x bedToBigBed fetchChromSizes
+
+# Full build (API must be running)
+python scripts/build_trackhub.py \
+  --api-url http://localhost:8000 \
+  --hub-url https://aryan-jhaveri.github.io/dbRIP-API/hub
+
+# Check output
+ls hub/hg38/
+# trackDb.txt  dbRIP.html  hg38.chrom.sizes
+# dbrip_alu_hg38.bb  dbrip_line1_hg38.bb  dbrip_sva_hg38.bb
+```
+
+### Test in UCSC browser
+
+After a full build, serve the hub locally and point UCSC at it:
+
+```bash
+# Serve on your local machine
+python -m http.server 8080 --directory .
+
+# In UCSC: My Data → Track Hubs → My Hubs → paste:
+#   http://YOUR_LOCAL_IP:8080/hub/hub.txt
+# (UCSC must be able to reach your machine — use ngrok for a public tunnel)
+```
+
+### How CI deploys automatically
+
+The GitHub Actions workflow (`.github/workflows/build-trackhub.yml`) runs the full
+pipeline whenever `data/raw/dbRIP_all.csv` or `frontend/src/**` changes on `main`:
+
+1. Builds SQLite from CSV
+2. Starts uvicorn locally on the CI runner
+3. Runs `build_trackhub.py` → bigBed files + hub config
+4. Builds the React frontend with `VITE_API_URL` baked in
+5. Deploys both to the `gh-pages` branch (frontend at `/`, hub at `/hub/`)
+
+You can also trigger it manually: GitHub → Actions → "Build Track Hub + Frontend" → Run workflow.
+
+### Check if the hub is stale
+
+After updating the CSV and re-ingesting, check whether the hub needs rebuilding:
+
+```bash
+# Start the API, then:
+python scripts/build_trackhub.py --status
+
+# Output:
+#   ME Type      Hub count   API count   Status
+#   ALU            33709       33709     OK
+#   LINE1           6958        7100     STALE
+```
+
+If any type shows STALE, push the new CSV to `main` and the CI workflow rebuilds automatically.
+
+### Update when the repo is forked
+
+The CI workflow builds the hub URL dynamically from the GitHub repo owner and name:
+```
+https://<owner>.github.io/<repo>/hub
+```
+
+When the lab forks this repo, the URL updates automatically. The only thing to change
+is the `RENDER_API_URL` env var in `.github/workflows/build-trackhub.yml` if the
+Render API moves to a different host.
+
+---
+
+## 5. File reference
 
 ### `data/manifests/dbrip_v1.yaml`
 
@@ -391,17 +520,47 @@ The main search tab. Contains:
 
 ---
 
+### `scripts/build_trackhub.py`
+
+Standalone CLI — builds the UCSC Track Hub from the running API.
+
+1. Auto-detects ME types from `GET /v1/stats?by=me_type`
+2. For each ME type: exports BED6 → sorts → converts to bigBed
+3. Renders hub config templates → `hub/` directory
+4. Writes `.build_meta.json` for stale detection
+
+Flags: `--api-url`, `--hub-url`, `--output-dir`, `--assemblies`, `--me-types`,
+`--hg19-fasta`, `--dry-run`, `--status`
+
+---
+
+### `data/hub/templates/`
+
+UCSC Track Hub configuration templates:
+
+- `hub.txt` — entry point (no placeholders, copied as-is)
+- `genomes.txt` — one stanza per assembly (`{assembly}` placeholder)
+- `trackDb_composite.txt` — composite parent header (no placeholders)
+- `trackDb_subtrack.txt` — per-ME-type sub-track (`{me_type}`, `{hub_url}`, `{assembly}`, `{color}`)
+- `dbRIP.html` — track description popup (no placeholders)
+
+Templates have comment blocks explaining the format for new RAs. The build script
+strips comments when rendering output to `hub/`.
+
+---
+
 ### `tests/`
 
 - `tests/fixtures/sample.csv` — 5-row subset of the real CSV (3 ALU, 1 LINE1, 1 SVA; edge cases: null TSD, null annotation)
 - `tests/test_ingest.py` — 13 tests: row counts, column renaming, population melt, null preservation
 - `tests/test_api.py` — 26 tests: endpoints, filters, pagination, export formats, 404s/400s
+- `tests/test_build_trackhub.py` — 31 tests: template rendering, FASTA parsing, BED output, build metadata, tool detection
 
 Test database: a pytest fixture creates a temporary SQLite DB, loads the 5-row fixture via `scripts/ingest.py`, and provides a FastAPI `TestClient` that uses it instead of the production DB.
 
 ---
 
-## 5. How a request flows through the system
+## 6. How a request flows through the system
 
 ```
 Browser sends:  GET /v1/insertions?me_type=ALU&limit=10

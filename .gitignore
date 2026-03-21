@@ -21,6 +21,9 @@ venv/
 *.sqlite
 NOTEBOOK/
 
+# Track Hub output (built by scripts/build_trackhub.py, deployed to gh-pages by CI)
+hub/
+
 # Environment
 .env
 
