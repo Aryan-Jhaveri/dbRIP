@@ -199,13 +199,101 @@ describe("DataTable", () => {
         data={sampleData}
         total={100}
         pageIndex={3}
-        pageSize={10}
+        pageSize={25}
         onPaginationChange={onChange}
       />
     );
-    // Change page size to 25
-    fireEvent.change(screen.getByDisplayValue("10"), { target: { value: "25" } });
+    // Change page size from 25 to 50
+    fireEvent.change(screen.getByDisplayValue("25"), { target: { value: "50" } });
     // Should reset to page 0 with new page size
-    expect(onChange).toHaveBeenCalledWith(0, 25);
+    expect(onChange).toHaveBeenCalledWith(0, 50);
+  });
+
+  // ── Select All / Deselect All button ──────────────────────────────────
+
+  it("shows Select All button when onSelectionChange is provided", () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={sampleData}
+        total={3}
+        pageIndex={0}
+        pageSize={10}
+        onPaginationChange={noop}
+        onSelectionChange={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Select All")).toBeInTheDocument();
+  });
+
+  it("does not show Select All button when onSelectionChange is omitted", () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={sampleData}
+        total={3}
+        pageIndex={0}
+        pageSize={10}
+        onPaginationChange={noop}
+      />
+    );
+    expect(screen.queryByText("Select All")).not.toBeInTheDocument();
+  });
+
+  it("does not show Select All button when data is empty", () => {
+    render(
+      <DataTable
+        columns={columns}
+        data={[]}
+        total={0}
+        pageIndex={0}
+        pageSize={10}
+        onPaginationChange={noop}
+        onSelectionChange={vi.fn()}
+      />
+    );
+    expect(screen.queryByText("Select All")).not.toBeInTheDocument();
+  });
+
+  it("calls onSelectionChange with all rows when Select All is clicked", () => {
+    const onSelection = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={sampleData}
+        total={3}
+        pageIndex={0}
+        pageSize={10}
+        onPaginationChange={noop}
+        onSelectionChange={onSelection}
+      />
+    );
+    fireEvent.click(screen.getByText("Select All"));
+    // onSelectionChange should be called with all 3 rows
+    expect(onSelection).toHaveBeenCalledWith(sampleData);
+  });
+
+  it("toggles to Deselect All after selecting all, then clears selection", () => {
+    const onSelection = vi.fn();
+    render(
+      <DataTable
+        columns={columns}
+        data={sampleData}
+        total={3}
+        pageIndex={0}
+        pageSize={10}
+        onPaginationChange={noop}
+        onSelectionChange={onSelection}
+      />
+    );
+    // Click Select All → button should change to Deselect All
+    fireEvent.click(screen.getByText("Select All"));
+    expect(screen.getByText("Deselect All")).toBeInTheDocument();
+
+    // Click Deselect All → should clear and button goes back to Select All
+    fireEvent.click(screen.getByText("Deselect All"));
+    expect(screen.getByText("Select All")).toBeInTheDocument();
+    // Last call should be with empty array (deselected)
+    expect(onSelection).toHaveBeenLastCalledWith([]);
   });
 });

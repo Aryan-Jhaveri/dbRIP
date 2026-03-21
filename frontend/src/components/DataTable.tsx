@@ -348,6 +348,28 @@ export default function DataTable<TData>({
             : `Showing ${firstRow} to ${lastRow} of ${total.toLocaleString()} entries`}
         </span>
 
+        {/* Select All / Deselect All — only shown when the parent opts into
+            row-click selection (onSelectionChange provided) AND there are rows.
+            Scope: current page only. Selections already clear on page change,
+            so "Select All" always means "select all rows I can see right now."
+            The button label toggles based on whether all rows are already selected. */}
+        {onSelectionChange && rows.length > 0 && (
+          <button
+            onClick={() => {
+              if (selectedIds.size === rows.length) {
+                // All rows selected → deselect all
+                setSelectedIds(new Set());
+              } else {
+                // Some or none selected → select all rows on this page
+                setSelectedIds(new Set(rows.map((r) => r.id)));
+              }
+            }}
+            className="border border-black dark:border-gray-500 px-3 h-8 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+          >
+            {selectedIds.size === rows.length ? "Deselect All" : "Select All"}
+          </button>
+        )}
+
         {/* Page size + navigation — also wraps internally via flex-wrap.
             All interactive elements use h-8 so browser-native <select> height
             and styled <button> height are forced to match exactly. */}
