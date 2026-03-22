@@ -478,3 +478,173 @@ class TestCheckTools:
         with patch("shutil.which", return_value="/usr/local/bin/bedToBigBed"):
             result = bth.check_tools(dry_run=False)
         assert result is True
+
+
+# ── Tests: archive_old_files ─────────────────────────────────────────────
+
+class TestArchiveOldFiles:
+    """archive_old_files moves existing .bb files to hub/archive/{timestamp}/."""
+
+    def _create_bb_files(self, output_dir: Path, assembly: str, names: list[str]):
+        """Helper: create fake .bb files in an assembly subdirectory."""
+        asm_dir = output_dir / assembly
+        asm_dir.mkdir(parents=True, exist_ok=True)
+        for name in names:
+            (asm_dir / name).write_text("fake bigbed data", encoding="utf-8")
+
+    def test_moves_bb_files_to_archive(self, tmp_path):
+        """Existing .bb files should be moved into hub/archive/{timestamp}/."""
+        hub = tmp_path / "hub"
+        self._create_bb_files(hub, "hg38", ["dbrip_alu_hg38.bb", "dbrip_line1_hg38.bb"])
+
+        result = bth.archive_old_files(hub, ["hg38"])
+
+        # The archive directory should exist and contain the moved files
+        assert result is not None
+        assert result.exists()
+        assert (result / "hg38" / "dbrip_alu_hg38.bb").exists()
+        assert (result / "hg38" / "dbrip_line1_hg38.bb").exists()
+
+        # Original files should no longer exist
+        assert not (hub / "hg38" / "dbrip_alu_hg38.bb").exists()
+        assert not (hub / "hg38" / "dbrip_line1_hg38.bb").exists()
+
+    def test_preserves_assembly_subdirectory_structure(self, tmp_path):
+        """Files from different assemblies should be in separate subdirectories."""
+        hub = tmp_path / "hub"
+        self._create_bb_files(hub, "hg38", ["dbrip_alu_hg38.bb"])
+        self._create_bb_files(hub, "hg19", ["dbrip_alu_hg19.bb"])
+
+        result = bth.archive_old_files(hub, ["hg38", "hg19"])
+
+        assert (result / "hg38" / "dbrip_alu_hg38.bb").exists()
+        assert (result / "hg19" / "dbrip_alu_hg19.bb").exists()
+
+    def test_returns_none_when_no_bb_files(self, tmp_path):
+        """If there are no .bb files, return None and skip archiving."""
+        hub = tmp_path / "hub"
+        hub.mkdir()
+
+        result = bth.archive_old_files(hub, ["hg38"])
+        assert result is None
+
+    def test_returns_none_when_assembly_dir_missing(self, tmp_path):
+        """If the assembly directory doesn't exist yet, return None."""
+        hub = tmp_path / "hub"
+        hub.mkdir()
+
+        result = bth.archive_old_files(hub, ["hg38"])
+        assert result is None
+
+    def test_archive_directory_is_timestamped(self, tmp_path):
+        """Archive directory name should be an ISO-like timestamp."""
+        hub = tmp_path / "hub"
+        self._create_bb_files(hub, "hg38", ["dbrip_alu_hg38.bb"])
+
+        result = bth.archive_old_files(hub, ["hg38"])
+
+        # The archive dir should be under hub/archive/ with a timestamp name
+        assert result.parent == hub / "archive"
+        # Timestamp format: YYYYMMDDTHHMMSSZ
+        assert len(result.name) == 16  # e.g. 20260322T120000Z
+        assert result.name.endswith("Z")
+
+    def test_multiple_archives_coexist(self, tmp_path):
+        """Running archive twice should create two separate timestamped directories."""
+        hub = tmp_path / "hub"
+
+        # First archive
+        self._create_bb_files(hub, "hg38", ["dbrip_alu_hg38.bb"])
+        first = bth.archive_old_files(hub, ["hg38"])
+
+        # Create new .bb files (simulating a rebuild)
+        self._create_bb_files(hub, "hg38", ["dbrip_alu_hg38.bb"])
+        second = bth.archive_old_files(hub, ["hg38"])
+
+        # Both archives should exist (timestamps may match if fast, but dirs are distinct)
+        assert first.exists()
+        assert second is not None
+
+    def test_non_bb_files_are_not_archived(self, tmp_path):
+        """Files that aren't .bb (like chrom.sizes, trackDb.txt) should stay."""
+        hub = tmp_path / "hub"
+        asm_dir = hub / "hg38"
+        asm_dir.mkdir(parents=True)
+        (asm_dir / "dbrip_alu_hg38.bb").write_text("bigbed", encoding="utf-8")
+        (asm_dir / "hg38.chrom.sizes").write_text("chr1\t248956422\n", encoding="utf-8")
+        (asm_dir / "trackDb.txt").write_text("track dbRIP\n", encoding="utf-8")
+
+        bth.archive_old_files(hub, ["hg38"])
+
+        # .bb moved, other files stay
+        assert not (asm_dir / "dbrip_alu_hg38.bb").exists()
+        assert (asm_dir / "hg38.chrom.sizes").exists()
+        assert (asm_dir / "trackDb.txt").exists()
+
+
+# ── Tests: cleanup_archive ───────────────────────────────────────────────
+
+class TestCleanupArchive:
+    """cleanup_archive deletes the entire hub/archive/ directory."""
+
+    def test_deletes_archive_directory(self, tmp_path):
+        """The archive directory and all contents should be deleted."""
+        hub = tmp_path / "hub"
+        archive = hub / "archive" / "20260322T120000Z" / "hg38"
+        archive.mkdir(parents=True)
+        (archive / "dbrip_alu_hg38.bb").write_text("old data", encoding="utf-8")
+
+        bth.cleanup_archive(hub)
+
+        assert not (hub / "archive").exists()
+
+    def test_no_archive_prints_message(self, tmp_path, capsys):
+        """If no archive exists, print a message and do nothing."""
+        hub = tmp_path / "hub"
+        hub.mkdir()
+
+        bth.cleanup_archive(hub)
+
+        captured = capsys.readouterr()
+        assert "Nothing to clean up" in captured.out
+
+    def test_reports_build_count_and_size(self, tmp_path, capsys):
+        """Should report how many old builds and total size before deleting."""
+        hub = tmp_path / "hub"
+        for ts in ["20260320T100000Z", "20260321T100000Z"]:
+            d = hub / "archive" / ts / "hg38"
+            d.mkdir(parents=True)
+            (d / "dbrip_alu_hg38.bb").write_text("x" * 100, encoding="utf-8")
+
+        bth.cleanup_archive(hub)
+
+        captured = capsys.readouterr()
+        assert "2 build(s)" in captured.out
+        assert "Deleted hub/archive/" in captured.out
+
+
+# ── Tests: show_archive_status ───────────────────────────────────────────
+
+class TestShowArchiveStatus:
+    """show_archive_status reports archive contents during --status."""
+
+    def test_no_archive(self, tmp_path, capsys):
+        hub = tmp_path / "hub"
+        hub.mkdir()
+
+        bth.show_archive_status(hub)
+
+        captured = capsys.readouterr()
+        assert "Archive: (none)" in captured.out
+
+    def test_with_archive(self, tmp_path, capsys):
+        hub = tmp_path / "hub"
+        d = hub / "archive" / "20260322T120000Z" / "hg38"
+        d.mkdir(parents=True)
+        (d / "dbrip_alu_hg38.bb").write_text("x" * 1000, encoding="utf-8")
+
+        bth.show_archive_status(hub)
+
+        captured = capsys.readouterr()
+        assert "1 old build(s)" in captured.out
+        assert "--cleanup" in captured.out

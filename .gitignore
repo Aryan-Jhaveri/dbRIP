@@ -24,6 +24,9 @@ NOTEBOOK/
 # Track Hub output (built by scripts/build_trackhub.py, deployed to gh-pages by CI)
 hub/
 
+# MkDocs build output
+site/
+
 # Environment
 .env
 

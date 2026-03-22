@@ -47,7 +47,7 @@ List insertions with optional filters and pagination.
 | `limit` | int | 50 | Page size (1–1000) |
 | `offset` | int | 0 | Pagination offset |
 
-All filter params use AND logic — providing multiple filters narrows the results. Comma-separated values within a single param use OR logic for that field.
+All filter params use AND logic. Providing multiple filters narrows the results. Comma-separated values within a single param use OR logic for that field.
 
 **Example:**
 
@@ -182,7 +182,7 @@ curl "http://localhost:8000/v1/export?format=csv" -o all.csv
 ```
 
 !!! note "Coordinate conversion"
-    The database stores 1-based coordinates (matching the source CSV). BED format requires 0-based, so the export converts: `bed_start = db_start - 1`. VCF and CSV use 1-based — no conversion needed.
+    The database stores 1-based coordinates (matching the source CSV). BED format requires 0-based, so the export converts: `bed_start = db_start - 1`. VCF and CSV use 1-based and need no conversion.
 
 ---
 

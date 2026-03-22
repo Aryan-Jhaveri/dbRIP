@@ -1,57 +1,43 @@
-# dbRIP API
+# dbRIP Wiki
 
-A read-only REST API for querying the [dbRIP database](https://lianglab.shinyapps.io/shinydbRIP/) of **retrotransposon insertion polymorphisms** — 44,984 TE insertions across 33 populations from the 1000 Genomes Project.
+A read-only REST API for querying the [dbRIP database](https://lianglab.shinyapps.io/shinydbRIP/) of retrotransposon insertion polymorphisms across 33 populations from the 1000 Genomes Project (hg38).
 
-## What Can You Do With It?
+| Service | URL |
+|---------|-----|
+| API + Web App | https://dbrip-api.onrender.com |
+| Frontend (GitHub Pages) | https://aryan-jhaveri.github.io/dbRIP/ |
+| UCSC Track Hub | [Load in UCSC](https://genome.ucsc.edu/cgi-bin/hgTracks?hubUrl=https://aryan-jhaveri.github.io/dbRIP/hub/hub.txt) |
 
-- **Search** insertions by genomic region, TE family, population frequency, and more
-- **Export** results as BED, VCF, or CSV for use with bedtools, genome browsers, or custom pipelines
-- **Get statistics** — counts by TE type, chromosome, variant class, or annotation
-- **Use the CLI** to query from the terminal and pipe results into other tools
-- **Build on top of it** — the API returns JSON, so any language or tool can consume it
+## Pages
 
-## Who Is This For?
+| Page | What it covers |
+|------|---------------|
+| [Getting Started](getting-started.md) | Setup, quick start, taking over the project |
+| [Architecture](architecture.md) | How the programs connect, design rules, request flow |
+| [Data and Schema](data.md) | The CSV, database tables, populations, coordinate systems |
+| [Ingest Pipeline](ingest.md) | ETL design, manifest YAML, loaders, data updates |
+| [API Reference](api-reference.md) | All endpoints, filters, response format, export |
+| [Frontend](frontend.md) | React app, six tabs, DataTable, bulk actions |
+| [Track Hub](track-hub.md) | UCSC Genome Browser integration, bigBed, build pipeline |
+| [CLI](cli.md) | `dbrip` terminal tool for search, export, stats |
+| [MCP](mcp.md) | Claude connector for natural-language queries |
+| [Maintenance](maintenance.md) | Adding/renaming columns, data updates, known issues |
+| [Deployment](deployment.md) | CI/CD, GitHub Pages, Render, forking |
+| [Concepts](concepts.md) | TE biology, genomic coordinates, population genetics |
 
-- **Bioinformaticians** who want to query TE insertions programmatically
-- **Lab members** who need to extract subsets of the data for analysis
-- **Tool builders** who want to integrate dbRIP data into pipelines or web apps
+## Key facts
 
-## Quick Example
+- Four TE families tracked: ALU, LINE1, SVA, HERVK
+- 33 population columns (26 individual + 7 aggregate) from 1000 Genomes
+- hg38 assembly, 1-based coordinates
+- Run `dbrip stats` or `GET /v1/stats?by=me_type` to see current counts
 
-```bash
-# Search for ALU insertions on chromosome 1
-curl "http://localhost:8000/v1/insertions?me_type=ALU&limit=5"
+## Access modes
 
-# Or use the CLI
-dbrip search --me-type ALU --limit 5
-
-# Export LINE1 insertions as BED for bedtools
-dbrip export --format bed --me-type LINE1 | bedtools intersect -a - -b peaks.bed
-```
-
-## How It Works
-
-```
-  data/raw/dbRIP_all.csv        ← Source CSV (44,984 rows, 47 columns)
-        │
-        ▼
-  scripts/ingest.py             ← Load CSV into SQLite (run once)
-        │
-        ▼
-  dbrip.sqlite                  ← Database (3 tables)
-        │
-        ▼
-  app/ (FastAPI)                ← REST API (7 endpoints)
-        │
-        ▼
-  JSON / BED / VCF / CSV       ← Query results
-```
-
-The CSV is the source of truth. The database is always rebuildable. The API is read-only.
-
-## Next Steps
-
-- **Setup** — see the [README](https://github.com/liang-lab/dbRIP#readme) for installation, data loading, and running the server
-- [API Reference](api-reference.md) — all endpoints with examples
-- [CLI Tool](cli.md) — terminal-based querying
-- [Biology Background](biology.md) — what are transposable elements?
+| Mode | Description |
+|------|-------------|
+| REST API | JSON, BED6, VCF, CSV exports with filters and pagination |
+| Web App | Six-tab React SPA with population frequency tables and IGV/UCSC export |
+| CLI | `dbrip search`, `dbrip export`, `dbrip stats` from the terminal |
+| MCP | Claude Desktop queries the database in natural language |
+| UCSC Track Hub | Colored, searchable tracks in the UCSC Genome Browser |

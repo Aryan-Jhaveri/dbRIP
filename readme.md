@@ -178,8 +178,8 @@ pytest tests/ -v                           # 101 tests
 
 ```
 data/raw/dbRIP_all.csv          ← source CSV (44,984 rows); DB is always rebuildable from this
-data/manifests/dbrip_v1.yaml   ← describes the CSV format for the ingest pipeline
-data/hub/templates/            ← UCSC track hub config templates
+data/manifests/dbrip_v1.yaml    ← describes the CSV format for the ingest pipeline
+data/hub/templates/             ← UCSC track hub config templates
 
 ingest/                         ← ETL pipeline (BaseLoader + dbRIP-specific loader)
 scripts/ingest.py               ← CLI to load CSV into SQLite

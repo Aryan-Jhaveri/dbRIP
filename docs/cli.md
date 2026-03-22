@@ -20,7 +20,7 @@ export DBRIP_API_URL=https://dbrip.example.com
 ```
 
 !!! note "The API server must be running"
-    The CLI is a thin wrapper around the API — it sends HTTP requests, not database queries. Make sure the API is running (`uvicorn app.main:app --reload`) before using the CLI.
+    The CLI sends HTTP requests to the API. It does not query the database directly. Make sure the API is running (`uvicorn app.main:app --reload`) before using the CLI.
 
 ---
 

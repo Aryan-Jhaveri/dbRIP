@@ -68,6 +68,7 @@ INSTALL PYTHON DEPENDENCY (httpx):
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -610,10 +611,111 @@ def show_status(output_dir: Path, api_url: str):
     if all_match:
         print("Hub is UP TO DATE.")
     else:
-        print("Hub is STALE — rebuild with:")
+        print("Hub is STALE. Rebuild with:")
         print(f"  python scripts/build_trackhub.py \\")
         print(f"    --api-url {api_url} \\")
         print(f"    --hub-url {meta.get('hub_url', 'YOUR_HUB_URL')}")
+
+    print()
+    show_archive_status(output_dir)
+
+
+# ── Archive management ────────────────────────────────────────────────────
+#
+# The gh-pages deploy step uses keep_files: true so that the frontend and
+# hub directories don't delete each other. The downside: old .bb files that
+# are no longer produced by the current build stay on gh-pages forever.
+#
+# To handle this, the build script moves existing .bb files into a local
+# archive directory before producing new ones. This way:
+#   - If the new build is bad, old files are recoverable from hub/archive/
+#   - The new build's .bb files are the only ones deployed to gh-pages
+#   - The archive accumulates locally; run --cleanup when you're satisfied
+#     the current build is correct
+#
+# The archive does NOT deploy to gh-pages (it's in hub/archive/ which is
+# inside the hub output directory, but gh-pages only publishes what CI pushes).
+
+def archive_old_files(output_dir: Path, assemblies: list[str]) -> Path | None:
+    """Move existing .bb files to hub/archive/{timestamp}/ before a rebuild.
+
+    Scans each assembly subdirectory for .bb files and moves them into
+    a timestamped archive folder, preserving the assembly/ subdirectory
+    structure so files from different assemblies don't collide.
+
+    Returns the archive directory path, or None if there was nothing to archive.
+    """
+    bb_files = []
+    for assembly in assemblies:
+        asm_dir = output_dir / assembly
+        if asm_dir.exists():
+            bb_files.extend(asm_dir.glob("*.bb"))
+
+    if not bb_files:
+        print("  No existing .bb files found. Nothing to archive.")
+        return None
+
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    archive_dir = output_dir / "archive" / timestamp
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    for bb in bb_files:
+        # Preserve assembly subdir: hub/hg38/foo.bb -> hub/archive/{ts}/hg38/foo.bb
+        rel = bb.relative_to(output_dir)
+        dest = archive_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(bb), str(dest))
+        print(f"  Archived: {rel} -> archive/{timestamp}/{rel}")
+
+    print(f"  {len(bb_files)} file(s) archived to hub/archive/{timestamp}/")
+    return archive_dir
+
+
+def cleanup_archive(output_dir: Path):
+    """Delete the hub/archive/ directory and all its contents.
+
+    This is a manual operation triggered by --cleanup. The archive holds
+    old .bb files from previous builds. Once you've confirmed the current
+    build is correct, run --cleanup to free disk space.
+    """
+    archive_dir = output_dir / "archive"
+    if not archive_dir.exists():
+        print("No archive directory found. Nothing to clean up.")
+        return
+
+    # Summarize what's there before deleting
+    subdirs = sorted([d for d in archive_dir.iterdir() if d.is_dir()])
+    total_size = sum(f.stat().st_size for f in archive_dir.rglob("*") if f.is_file())
+    size_mb = total_size / (1024 * 1024)
+
+    print(f"Archive contains {len(subdirs)} build(s), {size_mb:.1f} MB total:")
+    for d in subdirs:
+        bb_count = len(list(d.rglob("*.bb")))
+        print(f"  {d.name}: {bb_count} file(s)")
+
+    shutil.rmtree(archive_dir)
+    print(f"\nDeleted hub/archive/ ({size_mb:.1f} MB freed)")
+
+
+def show_archive_status(output_dir: Path):
+    """Print a summary of the archive directory contents.
+
+    Called as part of --status to show how much space old builds are using.
+    """
+    archive_dir = output_dir / "archive"
+    if not archive_dir.exists():
+        print("Archive: (none)")
+        return
+
+    subdirs = sorted([d for d in archive_dir.iterdir() if d.is_dir()])
+    if not subdirs:
+        print("Archive: (empty)")
+        return
+
+    total_size = sum(f.stat().st_size for f in archive_dir.rglob("*") if f.is_file())
+    size_mb = total_size / (1024 * 1024)
+    print(f"Archive: {len(subdirs)} old build(s), {size_mb:.1f} MB")
+    print(f"  Run --cleanup to delete: python scripts/build_trackhub.py --cleanup")
 
 
 # ── Per-assembly build functions ──────────────────────────────────────────
@@ -837,9 +939,19 @@ def main():
         action="store_true",
         help="Compare the last hub build to the current API row counts, then exit.",
     )
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Delete the hub/archive/ directory (old .bb files from previous builds), then exit.",
+    )
 
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
+
+    # ── --cleanup mode: delete the archive directory ──────────────────────
+    if args.cleanup:
+        cleanup_archive(output_dir)
+        return
 
     # ── --status mode: compare hub build to current API ───────────────────
     if args.status:
@@ -883,6 +995,15 @@ def main():
     print(f"ME types:    {me_types}")
     print(f"Dry run:     {args.dry_run}")
     print()
+
+    # ── Archive existing .bb files before rebuilding ─────────────────────
+    # In a non-dry-run build, move old .bb files to hub/archive/{timestamp}/
+    # so they don't get deployed alongside the new ones. If the new build
+    # turns out to be bad, recover files from the archive.
+    if not args.dry_run:
+        print("=== Archiving existing .bb files ===")
+        archive_old_files(output_dir, args.assemblies)
+        print()
 
     # ── Build tracks per assembly ─────────────────────────────────────────
     built_assemblies: list[str] = []
