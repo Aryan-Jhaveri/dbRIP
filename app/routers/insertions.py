@@ -46,7 +46,7 @@ router = APIRouter(prefix="/v1", tags=["insertions"])
 
 def _apply_filters(query, me_type, me_subtype, me_category, variant_class,
                    annotation, dataset_id, population, min_freq, max_freq, db,
-                   strand=None, chrom=None, search=None):
+                   strand=None, chrom=None, search=None, assembly=None):
     """Apply optional filters to an insertions query.
 
     This is shared between the list endpoint and the region endpoint so
@@ -96,6 +96,11 @@ def _apply_filters(query, me_type, me_subtype, me_category, variant_class,
             query = query.filter(Insertion.annotation.in_(values))
     if dataset_id:
         query = query.filter(Insertion.dataset_id == dataset_id)
+
+    # Assembly filter — needed when the DB contains data from multiple assemblies
+    # (e.g. hg38 and hs1). Without this, list and export endpoints return mixed results.
+    if assembly:
+        query = query.filter(Insertion.assembly == assembly)
 
     # Strand filter — accepts "+" | "-" | "null" or comma-separated combos.
     # "null" is stored as SQL NULL in the DB, so we translate it specially.
@@ -170,6 +175,7 @@ def list_insertions(
     strand: str | None = None,
     chrom: str | None = None,
     search: str | None = None,
+    assembly: str | None = None,
     limit: int = Query(default=50, le=1000, ge=1),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -183,11 +189,12 @@ def list_insertions(
         /v1/insertions?strand=%2B            (+ must be URL-encoded)
         /v1/insertions?chrom=chr1,chr2,chrX  (comma-separated for multiple)
         /v1/insertions?search=ALU            (free-text search across key columns)
+        /v1/insertions?assembly=hg38         (filter by genome assembly)
     """
     query = db.query(Insertion)
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
                            annotation, dataset_id, population, min_freq, max_freq, db,
-                           strand=strand, chrom=chrom, search=search)
+                           strand=strand, chrom=chrom, search=search, assembly=assembly)
 
     total = query.count()
     results = query.order_by(Insertion.id).offset(offset).limit(limit).all()

@@ -346,3 +346,69 @@ class TestConnectionErrors:
         result = runner.invoke(app, ["search"])
         assert result.exit_code == 1
         assert "Could not connect" in result.output
+
+
+# ── Assembly filter tests ────────────────────────────────────────────────
+
+
+class TestAssemblyFlag:
+    """The --assembly flag filters by genome assembly on search, export, and stats."""
+
+    @patch("cli.dbrip.httpx.get")
+    def test_search_assembly_passed_as_query_param(self, mock_get):
+        """Without --region, --assembly should be passed as a query parameter."""
+        mock_get.return_value = _mock_response(SEARCH_RESPONSE)
+        result = runner.invoke(app, ["search", "--assembly", "hs1"])
+        assert result.exit_code == 0
+        # Check the params dict passed to httpx.get
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
+        assert params.get("assembly") == "hs1"
+
+    @patch("cli.dbrip.httpx.get")
+    def test_search_region_uses_assembly_in_path(self, mock_get):
+        """With --region, --assembly should appear in the URL path, not params."""
+        mock_get.return_value = _mock_response(SEARCH_RESPONSE)
+        result = runner.invoke(app, ["search", "--region", "chr1:1M-5M", "--assembly", "hs1"])
+        assert result.exit_code == 0
+        call_url = mock_get.call_args[0][0]
+        assert "/v1/insertions/region/hs1/" in call_url
+
+    @patch("cli.dbrip.httpx.get")
+    def test_search_region_defaults_to_hg38(self, mock_get):
+        """Region search without --assembly should default to hg38."""
+        mock_get.return_value = _mock_response(SEARCH_RESPONSE)
+        result = runner.invoke(app, ["search", "--region", "chr1:1M-5M"])
+        assert result.exit_code == 0
+        call_url = mock_get.call_args[0][0]
+        assert "/v1/insertions/region/hg38/" in call_url
+
+    @patch("cli.dbrip.httpx.get")
+    def test_export_assembly_passed(self, mock_get):
+        """Export with --assembly should pass it as a query param."""
+        mock_get.return_value = _mock_response(text="chr1\t100\t200\tA001\t0\t+\n")
+        result = runner.invoke(app, ["export", "--format", "bed", "--assembly", "hg38"])
+        assert result.exit_code == 0
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
+        assert params.get("assembly") == "hg38"
+
+    @patch("cli.dbrip.httpx.get")
+    def test_stats_assembly_passed(self, mock_get):
+        """Stats with --assembly should pass it as a query param."""
+        mock_get.return_value = _mock_response(STATS_RESPONSE)
+        result = runner.invoke(app, ["stats", "--assembly", "hg38"])
+        assert result.exit_code == 0
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
+        assert params.get("assembly") == "hg38"
+
+    @patch("cli.dbrip.httpx.get")
+    def test_stats_dataset_id_passed(self, mock_get):
+        """Stats with --dataset-id should pass it as a query param."""
+        mock_get.return_value = _mock_response(STATS_RESPONSE)
+        result = runner.invoke(app, ["stats", "--dataset-id", "dbrip_v1"])
+        assert result.exit_code == 0
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params", {})
+        assert params.get("dataset_id") == "dbrip_v1"

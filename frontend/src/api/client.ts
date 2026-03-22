@@ -97,6 +97,12 @@ export interface ListInsertionsParams {
    * totals are accurate across all pages, not just the current page.
    */
   search?: string | null;
+  /**
+   * Filter by genome assembly (e.g. "hg38", "hs1"). When the DB contains
+   * data from multiple assemblies, this prevents mixed results. Optional —
+   * omit to return all assemblies.
+   */
+  assembly?: string | null;
   limit?: number;
   offset?: number;
 }

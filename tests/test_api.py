@@ -369,3 +369,61 @@ class TestChromFilter:
         r = client.get("/v1/export?format=csv&chrom=chr1")
         lines = r.text.strip().splitlines()
         assert len(lines) == 6  # header + 5 rows
+
+
+# ── Assembly filter ──────────────────────────────────────────────────────
+
+class TestAssemblyFilter:
+    """The assembly filter lets you isolate data from a specific genome assembly.
+
+    All sample data is hg38, so filtering by hg38 returns everything and
+    filtering by a different assembly returns nothing.
+    """
+
+    def test_list_filter_by_assembly_match(self, client):
+        """assembly=hg38 should return all rows (all sample data is hg38)."""
+        r = client.get("/v1/insertions?assembly=hg38")
+        assert r.status_code == 200
+        assert r.json()["total"] == 5
+
+    def test_list_filter_by_assembly_no_match(self, client):
+        """assembly=hs1 should return 0 rows (no hs1 data in sample)."""
+        r = client.get("/v1/insertions?assembly=hs1")
+        assert r.status_code == 200
+        assert r.json()["total"] == 0
+
+    def test_list_no_assembly_returns_all(self, client):
+        """Omitting assembly should return all rows regardless of assembly."""
+        r = client.get("/v1/insertions")
+        assert r.status_code == 200
+        assert r.json()["total"] == 5
+
+    def test_export_filter_by_assembly(self, client):
+        """Export with assembly=hg38 returns all rows; hs1 returns header only."""
+        r_hg38 = client.get("/v1/export?format=csv&assembly=hg38")
+        r_hs1 = client.get("/v1/export?format=csv&assembly=hs1")
+        hg38_lines = r_hg38.text.strip().splitlines()
+        hs1_lines = r_hs1.text.strip().splitlines()
+        assert len(hg38_lines) == 6  # header + 5 data rows
+        assert len(hs1_lines) == 1   # header only
+
+    def test_stats_filter_by_assembly(self, client):
+        """Stats with assembly=hg38 should return counts; hs1 should return empty."""
+        r_hg38 = client.get("/v1/stats?by=me_type&assembly=hg38")
+        r_hs1 = client.get("/v1/stats?by=me_type&assembly=hs1")
+        assert r_hg38.status_code == 200
+        assert r_hs1.status_code == 200
+        assert len(r_hg38.json()["entries"]) > 0
+        assert len(r_hs1.json()["entries"]) == 0
+
+    def test_stats_filter_by_dataset_id(self, client):
+        """Stats with dataset_id filter should work."""
+        r = client.get("/v1/stats?by=me_type&dataset_id=dbrip_v1")
+        assert r.status_code == 200
+        assert len(r.json()["entries"]) > 0
+
+    def test_assembly_combined_with_me_type(self, client):
+        """Assembly filter should stack with other filters (AND logic)."""
+        r = client.get("/v1/insertions?assembly=hg38&me_type=ALU")
+        assert r.status_code == 200
+        assert r.json()["total"] == 3

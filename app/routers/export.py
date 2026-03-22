@@ -52,7 +52,7 @@ _POP_ORDER = [
 
 def _get_filtered_insertions(db, me_type, me_subtype, me_category, variant_class,
                               annotation, dataset_id, population, min_freq, max_freq,
-                              strand=None, chrom=None):
+                              strand=None, chrom=None, assembly=None):
     """Build and execute a filtered query, returning all matching insertions.
 
     Uses joinedload so population frequencies are fetched in the same SQL query
@@ -62,7 +62,7 @@ def _get_filtered_insertions(db, me_type, me_subtype, me_category, variant_class
     query = db.query(Insertion).options(joinedload(Insertion.pop_frequencies))
     query = _apply_filters(query, me_type, me_subtype, me_category, variant_class,
                            annotation, dataset_id, population, min_freq, max_freq, db,
-                           strand=strand, chrom=chrom)
+                           strand=strand, chrom=chrom, assembly=assembly)
     return query.order_by(Insertion.chrom, Insertion.start).all()
 
 
@@ -173,6 +173,7 @@ def export_insertions(
     max_freq: float | None = None,
     strand: str | None = None,
     chrom: str | None = None,
+    assembly: str | None = None,
     db: Session = Depends(get_db),
 ):
     """Export insertions in BED, VCF, or CSV format.
@@ -183,6 +184,7 @@ def export_insertions(
         /v1/export?format=bed&me_type=ALU
         /v1/export?format=vcf&population=EUR&min_freq=0.1
         /v1/export?format=csv&strand=%2B&chrom=chr1,chr2
+        /v1/export?format=bed&assembly=hg38
     """
     if format not in FORMATS:
         raise HTTPException(
@@ -193,7 +195,7 @@ def export_insertions(
     insertions = _get_filtered_insertions(
         db, me_type, me_subtype, me_category, variant_class,
         annotation, dataset_id, population, min_freq, max_freq,
-        strand=strand, chrom=chrom,
+        strand=strand, chrom=chrom, assembly=assembly,
     )
 
     converter, media_type, extension = FORMATS[format]

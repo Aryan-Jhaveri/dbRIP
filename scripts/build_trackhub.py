@@ -201,14 +201,21 @@ def get_row_counts_from_api(api_url: str) -> dict[str, int]:
     return {e["label"]: e["count"] for e in data["entries"] if e["label"] != "(null)"}
 
 
-def fetch_bed_to_file(api_url: str, me_type: str, output_path: Path, timeout: int = 120):
+def fetch_bed_to_file(api_url: str, me_type: str, output_path: Path,
+                      timeout: int = 120, assembly: str | None = None):
     """Download the BED6 export for one ME type to a local file.
 
     Uses HTTP streaming so we never hold all ~18,000+ ALU rows in memory
     at once. The 120s timeout is generous to allow for Render cold-starts
     (the free tier sleeps after inactivity; first request takes ~30s).
+
+    If assembly is provided, only rows matching that assembly are exported.
+    This prevents mixed-assembly bigBed files when the DB contains data
+    from multiple assemblies.
     """
     url = f"{api_url.rstrip('/')}/v1/export?format=bed&me_type={me_type}"
+    if assembly:
+        url += f"&assembly={assembly}"
     print(f"    Downloading BED: {url}")
 
     try:
@@ -720,25 +727,32 @@ def show_archive_status(output_dir: Path):
 
 # ── Per-assembly build functions ──────────────────────────────────────────
 
-def build_hg38(
+def build_from_api(
     api_url: str,
     output_dir: Path,
     me_types: list[str],
     dry_run: bool,
+    assembly: str = "hg38",
 ) -> dict[str, int]:
-    """Build bigBed files for hg38 by exporting BED data from the API.
+    """Build bigBed files for any assembly by exporting BED data from the API.
+
+    This function is assembly-agnostic. It works for hg38, hs1, or any
+    future assembly. The assembly name is used for:
+        - The output directory path (hub/{assembly}/)
+        - The chrom.sizes filename ({assembly}.chrom.sizes)
+        - The bigBed filename (dbrip_{type}_{assembly}.bb)
+        - Filtering the API export (&assembly={assembly})
 
     Pipeline per ME type:
-        1. GET /v1/export?format=bed&me_type={TYPE}  → raw BED file (temp)
-        2. sort -k1,1 -k2,2n                         → sorted BED file (temp)
-        3. fetchChromSizes hg38                       → hg38.chrom.sizes (cached)
-        4. bedToBigBed -type=bed6 ...                 → dbrip_{type}_hg38.bb
+        1. GET /v1/export?format=bed&me_type={TYPE}&assembly={ASSEMBLY}
+        2. sort -k1,1 -k2,2n
+        3. fetchChromSizes {assembly}  (cached per build)
+        4. bedToBigBed -type=bed6 ...  → dbrip_{type}_{assembly}.bb
 
     In dry-run mode, steps 1-4 are skipped (no API call, no UCSC tools).
 
     Returns a dict of {me_type: row_count} for writing to .build_meta.json.
     """
-    assembly = "hg38"
     asm_dir  = output_dir / assembly
 
     if dry_run:
@@ -769,9 +783,9 @@ def build_hg38(
         for me_type in me_types:
             print(f"\n  [{assembly}] Processing {me_type} ...")
 
-            # Step 1 — download BED
+            # Step 1 — download BED (filtered by assembly to avoid mixed coordinates)
             raw_bed = tmp / f"{me_type}_raw.bed"
-            fetch_bed_to_file(api_url, me_type, raw_bed)
+            fetch_bed_to_file(api_url, me_type, raw_bed, assembly=assembly)
 
             # Count insertions (each non-empty line = one insertion)
             n_rows = sum(1 for ln in raw_bed.read_text().splitlines() if ln.strip())
@@ -1012,17 +1026,10 @@ def main():
     for assembly in args.assemblies:
         print(f"=== Assembly: {assembly} ===")
 
-        if assembly == "hg38":
-            row_counts = build_hg38(
-                api_url    = args.api_url,
-                output_dir = output_dir,
-                me_types   = me_types,
-                dry_run    = args.dry_run,
-            )
-            all_row_counts.update(row_counts)
-            built_assemblies.append(assembly)
-
-        elif assembly == "hg19":
+        if assembly == "hg19":
+            # hg19 is special: it reads native coordinates from a FASTA file
+            # rather than exporting from the API. All other assemblies use
+            # the API export path (build_from_api).
             build_hg19(
                 fasta_path = Path(args.hg19_fasta),
                 output_dir = output_dir,
@@ -1032,7 +1039,18 @@ def main():
             built_assemblies.append(assembly)
 
         else:
-            print(f"  WARNING: Assembly '{assembly}' is not supported. Skipping.")
+            # Generic path: works for hg38, hs1, or any future assembly.
+            # Exports BED from the API (filtered by assembly), sorts, and
+            # converts to bigBed. fetchChromSizes handles the chrom sizes.
+            row_counts = build_from_api(
+                api_url    = args.api_url,
+                output_dir = output_dir,
+                me_types   = me_types,
+                dry_run    = args.dry_run,
+                assembly   = assembly,
+            )
+            all_row_counts.update(row_counts)
+            built_assemblies.append(assembly)
 
         print()
 

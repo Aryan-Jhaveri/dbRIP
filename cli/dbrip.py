@@ -271,6 +271,7 @@ def _build_filters(
     population: str | None = None,
     min_freq: float | None = None,
     max_freq: float | None = None,
+    assembly: str | None = None,
 ) -> dict:
     """Build a query params dict from filter arguments, skipping None values.
 
@@ -288,6 +289,7 @@ def _build_filters(
         "population": population,
         "min_freq": min_freq,
         "max_freq": max_freq,
+        "assembly": assembly,
     }
 
 
@@ -301,9 +303,10 @@ def search(
         None, "--region", "-r",
         help="Genomic region, e.g. chr1:1M-5M. Supports K/M suffixes.",
     ),
-    assembly: str = typer.Option(
-        "hg38", "--assembly", "-a",
-        help="Genome assembly (used with --region).",
+    assembly: Optional[str] = typer.Option(
+        None, "--assembly", "-a",
+        help="Genome assembly (e.g. hg38, hs1). Used as region path param with --region, "
+             "or as a filter param without --region. Defaults to hg38 for --region.",
     ),
     # ── Insertion filters ──
     me_type: Optional[str] = typer.Option(None, "--me-type", help="TE family (ALU, LINE1, SVA, HERVK)."),
@@ -339,12 +342,18 @@ def search(
         me_type=me_type, me_subtype=me_subtype, me_category=me_category,
         variant_class=variant_class, annotation=annotation, dataset_id=dataset_id,
         population=population, min_freq=min_freq, max_freq=max_freq,
+        assembly=assembly,
     )
 
     if region:
         parsed = _parse_region_shorthand(region)
-        path = f"/v1/insertions/region/{assembly}/{parsed}"
+        # Region endpoint uses assembly as a path parameter, not a query param.
+        # Default to hg38 if not specified (region search requires an assembly).
+        region_assembly = assembly or "hg38"
+        path = f"/v1/insertions/region/{region_assembly}/{parsed}"
         status_msg = f"Searching {parsed}…"
+        # Remove assembly from filters dict — it's already in the URL path
+        filters.pop("assembly", None)
     else:
         path = "/v1/insertions"
         status_msg = "Searching…"
@@ -497,6 +506,7 @@ def export(
     variant_class: Optional[str] = typer.Option(None, "--variant-class", help="Frequency class."),
     annotation: Optional[str] = typer.Option(None, "--annotation", help="Genomic context."),
     dataset_id: Optional[str] = typer.Option(None, "--dataset-id", help="Filter by dataset."),
+    assembly: Optional[str] = typer.Option(None, "--assembly", "-a", help="Genome assembly (e.g. hg38, hs1)."),
     # ── Population filters ──
     population: Optional[str] = typer.Option(None, "--population", "-p", help="Population code."),
     min_freq: Optional[float] = typer.Option(None, "--min-freq", help="Minimum allele frequency."),
@@ -518,6 +528,7 @@ def export(
         me_type=me_type, me_subtype=me_subtype, me_category=me_category,
         variant_class=variant_class, annotation=annotation, dataset_id=dataset_id,
         population=population, min_freq=min_freq, max_freq=max_freq,
+        assembly=assembly,
     )
     params = {**filters, "format": format}
 
@@ -545,6 +556,8 @@ def stats(
         "me_type", "--by", "-b",
         help="Field to group by: me_type, chrom, variant_class, annotation, me_category, dataset_id.",
     ),
+    assembly: Optional[str] = typer.Option(None, "--assembly", "-a", help="Filter by genome assembly (e.g. hg38, hs1)."),
+    dataset_id: Optional[str] = typer.Option(None, "--dataset-id", help="Filter by dataset."),
     output: str = typer.Option("table", "--output", "-o", help="Output format: table or json."),
 ):
     """Show summary counts grouped by a field.
@@ -556,8 +569,15 @@ def stats(
         dbrip stats --by chrom
 
         dbrip stats --by variant_class --output json
+
+        dbrip stats --assembly hg38
     """
-    data = _get("/v1/stats", {"by": by}, status_msg=f"Counting by {by}…")
+    params = {"by": by}
+    if assembly:
+        params["assembly"] = assembly
+    if dataset_id:
+        params["dataset_id"] = dataset_id
+    data = _get("/v1/stats", params, status_msg=f"Counting by {by}…")
 
     if output == "json":
         typer.echo(json.dumps(data, indent=2))

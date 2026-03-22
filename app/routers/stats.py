@@ -42,6 +42,8 @@ ALLOWED_GROUP_BY = {
 @router.get("/stats", response_model=StatsResponse)
 def get_stats(
     by: str = Query(default="me_type", description="Field to group by"),
+    assembly: str | None = Query(default=None, description="Filter by genome assembly (e.g. hg38, hs1)"),
+    dataset_id: str | None = Query(default=None, description="Filter by dataset ID"),
     db: Session = Depends(get_db),
 ):
     """Get summary counts grouped by a field.
@@ -49,6 +51,7 @@ def get_stats(
     Examples:
         /v1/stats?by=me_type         → {"entries": [{"label": "ALU", "count": 33709}, ...]}
         /v1/stats?by=variant_class   → {"entries": [{"label": "Common", "count": 12287}, ...]}
+        /v1/stats?by=me_type&assembly=hg38  → counts only hg38 insertions
     """
     if by not in ALLOWED_GROUP_BY:
         raise HTTPException(
@@ -58,8 +61,16 @@ def get_stats(
 
     column = ALLOWED_GROUP_BY[by]
 
+    query = db.query(column, func.count().label("count"))
+
+    # Optional filters — narrow the aggregation to a specific assembly or dataset
+    if assembly:
+        query = query.filter(Insertion.assembly == assembly)
+    if dataset_id:
+        query = query.filter(Insertion.dataset_id == dataset_id)
+
     rows = (
-        db.query(column, func.count().label("count"))
+        query
         .group_by(column)
         .order_by(func.count().desc())
         .all()
